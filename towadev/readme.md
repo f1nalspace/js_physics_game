@@ -7,3 +7,9 @@ But it requires a webserver due to the dynamic script and resource loading.
 The main game does not require any dependencies, everything is written myself.
 
 For the editor.html and calc.html though "Bootstrap UI" and "jQuery" is required!
+
+Screenshot:
+
+![Towadev Screenshot](screenshot.jpg)
+
+
