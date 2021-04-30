@@ -4,7 +4,7 @@ This repository contains all my javascript physics and game related stuff i wrot
 The reason i wrote this, was to simply learn advanced javascript, implement physical simulations myself, or just write small game prototypes.
 
 ## Contents
-| Folder     | Description                                                      | Requires       |
+| Folder     | Description                                                      | Requirements   |
 |------------|------------------------------------------------------------------|----------------|
 | broken     | Contains broken, partly working experimental demos               | None/Webserver |
 | crashout   | A nice & small physics based breakout game                       | None           |
