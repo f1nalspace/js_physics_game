@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>2D impulse-based Phyiscs-Engine by Torsten Späte</title>
+<style type="text/css">
+    html, body {
+        margin: 0;
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+    }
+</style>
+<script type="text/javascript">
+var ContactGenGame = (function () {
+    Function.prototype.extends = function (b) {
+        var d = this;
+        for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+        function __() {
+            this.constructor = d;
+        }
+
+        __.prototype = b.prototype;
+        d.prototype = new __();
+    };
+
+    var Keys = {
+        Space: 32,
+        Left: 37,
+        Right: 39,
+        C: 67,
+        I: 73,
+        R: 82,
+        V: 86,
+        PageUp: 33,
+        PageDown: 34
+    };
+
+    function Canvas2DRenderer(canvas) {
+        var c = canvas;
+        var r = canvas.getContext("2d");
+        if (!r.setLineDash) {
+            r.setLineDash = function (arg) {
+            }
+        }
+        return {
+            clear: function () {
+                r.clearRect(0, 0, c.width, c.height);
+            },
+            setFont: function(name, size, style){
+                r.font = style + " " + size + "px " + name;
+            },
+            fillRect: function (x, y, w, h, color) {
+                r.fillStyle = color;
+                r.fillRect(x, y, w, h);
+            },
+            strokeRect: function (x, y, w, h, color, width) {
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.strokeRect(x, y, w, h);
+                r.lineWidth = 1;
+            },
+            fillArc: function (x, y, rad, color) {
+                r.fillStyle = color;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.fill();
+            },
+            strokeArc: function (x, y, rad, color, width) {
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.stroke();
+                r.lineWidth = 1;
+            },
+            line: function (x0, y0, x1, y1, color, width, dash) {
+                r.setLineDash(dash || []);
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.beginPath();
+                r.moveTo(x0, y0);
+                r.lineTo(x1, y1);
+                r.stroke();
+                r.lineWidth = 1;
+                r.setLineDash([]);
+            },
+            text: function (x, y, text, color, align, baseline) {
+                r.textAlign = align || "left";
+                r.textBaseline = baseline || "top";
+                r.fillStyle = color;
+                r.fillText(text, x, y);
+            },
+            push: function () {
+                r.save();
+            },
+            pop: function () {
+                r.restore();
+            },
+            translate: function (x, y) {
+                r.translate(x, y);
+            },
+            scale: function (x, y) {
+                r.scale(x, y);
+            },
+            rotate: function (v) {
+                r.rotate(v);
+            },
+            setOpacity: function (v) {
+                r.globalAlpha = v;
+            },
+            resetOpacity: function () {
+                r.globalAlpha = 1;
+            }
+        };
+    }
+
+    function Bounds(l, t, r, b) {
+        return [l || 0, t || 0, r || 0, b || 0];
+    }
+
+    var bounds = {
+        combine: function (o, a, b) {
+            o[0] = a[0] < b[0] ? a[0] : b[0];
+            o[1] = a[1] < b[1] ? a[1] : b[1];
+            o[2] = a[2] > b[0] ? a[2] : b[2];
+            o[3] = a[3] > b[3] ? a[3] : b[3];
+        },
+        intersectsWith: function (a, b) {
+            return (a[2] >= b[0] && a[3] >= b[1]) && (a[0] <= b[2] && a[1] <= b[3]);
+        }
+    };
+
+    function Vec2(x, y) {
+        return [x || 0, y || 0];
+    }
+
+    var vec2 = {
+        createArray: function (count) {
+            var a = new Array(count);
+            for (var i = 0; i < count; i++) {
+                a[i] = Vec2();
+            }
+            return a;
+        },
+        set: function (v, x, y) {
+            v[0] = x;
+            v[1] = y;
+        },
+        add: function (v, a, b) {
+            v[0] = a[0] + b[0];
+            v[1] = a[1] + b[1];
+        },
+        addScalar: function (v, a, scalar) {
+            v[0] = a[0] + scalar;
+            v[1] = a[1] + scalar;
+        },
+        sub: function (v, a, b) {
+            v[0] = a[0] - b[0];
+            v[1] = a[1] - b[1];
+        },
+        mult: function (v, a, b) {
+            v[0] = a[0] * b[0];
+            v[1] = a[1] * b[1];
+        },
+        addMultScalar: function (v, a, b, scalar) {
+            v[0] = a[0] + b[0] * scalar;
+            v[1] = a[1] + b[1] * scalar;
+        },
+        subMultScalar: function (v, a, b, scalar) {
+            v[0] = a[0] - b[0] * scalar;
+            v[1] = a[1] - b[1] * scalar;
+        },
+        multScalar: function (v, a, scalar) {
+            v[0] = a[0] * scalar;
+            v[1] = a[1] * scalar;
+        },
+        dot: function (a, b) {
+            return a[0] * b[0] + a[1] * b[1];
+        },
+        length: function (v) {
+            return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        },
+        lengthSquared: function (v) {
+            return v[0] * v[0] + v[1] * v[1];
+        },
+        normalize: function (v, a) {
+            var l = Math.sqrt(a[0] * a[0] + a[1] * a[1]);
+            if (l == 0) l = 1;
+            v[0] = a[0] / l;
+            v[1] = a[1] / l;
+        },
+        zero: function (v) {
+            v[0] = 0;
+            v[1] = 0;
+        },
+        perp: function (v, a) {
+            var ax = a[0];
+            var ay = a[1];
+            v[0] = -ay;
+            v[1] = ax;
+        },
+        copy: function (v, a) {
+            v[0] = a[0];
+            v[1] = a[1];
+        },
+        rotateAxis: function(v, axis, angle){
+            v[0] = axis[0] * Math.cos(angle) + axis[1] * Math.sin(angle);
+            v[1] = axis[1] * Math.cos(angle) - axis[0] * Math.sin(angle);
+        }
+    };
+
+    var bodyID = 0;
+
+    function Body(pos, mass) {
+        this.id = ++bodyID;
+        this.pos = pos;
+        this.mass = mass;
+        this.invMass = mass > 0 ? 1 / mass : 0;
+        this.vel = Vec2();
+        this.force = Vec2();
+        this.aabbA = Bounds();
+        this.aabbB = Bounds();
+    }
+
+    Body.prototype.getAxis = function (other) {
+        return [];
+    };
+
+    /**
+     * @param output [Object]
+     * @param point [Object]
+     * @returns {boolean}
+     */
+    Body.prototype.getClosestPoint = function (output, point) {
+        return false;
+    };
+
+    Body.prototype.getBounds = function (output, ox, oy) {
+        return output;
+    };
+
+    Body.prototype.getVelocityBounds = function (output, dt) {
+        this.getBounds(this.aabbA);
+        this.getBounds(this.aabbB, this.vel[0] * dt * 2, this.vel[1] * dt * 2);
+        output[0] = Math.min(this.aabbA[0], this.aabbB[0]);
+        output[1] = Math.min(this.aabbA[1], this.aabbB[1]);
+        output[2] = Math.max(this.aabbA[2], this.aabbB[2]);
+        output[3] = Math.max(this.aabbA[3], this.aabbB[3]);
+    };
+
+    Body.prototype.addForce = function (x, y) {
+        this.force[0] += x * this.mass;
+        this.force[1] += y * this.mass;
+    };
+
+    Body.prototype.addImpulse = function (normal, impulse) {
+        this.vel[0] += normal[0] * (impulse || 1) * this.invMass;
+        this.vel[1] += normal[1] * (impulse || 1) * this.invMass;
+    };
+
+    Body.prototype.update = function (dt) {
+        var tempX = this.vel[0];
+        var tempY = this.vel[1];
+        this.vel[0] += (this.force[0] * this.invMass) * dt;
+        this.vel[1] += (this.force[1] * this.invMass) * dt;
+        this.pos[0] += (tempX + this.vel[0]) * 0.5 * dt;
+        this.pos[1] += (tempY + this.vel[1]) * 0.5 * dt;
+        vec2.zero(this.force);
+    };
+
+    function OBB(pos, radius, mass, color) {
+        Body.call(this, pos, mass * radius[0] * 2 * radius[0] * 2);
+        this.radius = radius;
+        this.color = color;
+        this.axis = [Vec2(1, 0), Vec2(0, 1)];
+        this.rotation = 0;
+    }
+
+    OBB.extends(Body);
+
+    OBB.prototype.getBounds = function (output, ox, oy) {
+        var rW = Math.abs(vec2.dot(Vec2(1,0), this.axis[0])) * this.radius[0] + Math.abs(vec2.dot(Vec2(1,0), this.axis[1])) * this.radius[1];
+        var rH = Math.abs(vec2.dot(Vec2(0,1), this.axis[0])) * this.radius[0] + Math.abs(vec2.dot(Vec2(0,1), this.axis[1])) * this.radius[1];
+        output[0] = (ox||0) + this.pos[0] - rW;
+        output[1] = (oy||0) + this.pos[1] - rH;
+        output[2] = (ox||0) + this.pos[0] + rW;
+        output[3] = (oy||0) + this.pos[1] + rH;
+    };
+
+    OBB.prototype.rotate = function(angle) {
+        var degree = Math.PI / 180 * angle;
+        this.rotation = degree;
+        vec2.rotateAxis(this.axis[0], Vec2(1,0), degree);
+        vec2.rotateAxis(this.axis[1], Vec2(0,1), degree);
+    };
+
+    OBB.prototype.getAxis = function (other) {
+        return this.axis;
+    };
+
+    OBB.prototype.project = function (output, axis) {
+        var r = Math.abs(vec2.dot(axis, this.axis[0])) * this.radius[0] + Math.abs(vec2.dot(axis, this.axis[1])) * this.radius[1];
+        output[0] = -r;
+        output[1] = +r;
+    };
+
+    OBB.prototype.getClosestPoint = function (output, point) {
+        var cp = Vec2();
+        vec2.sub(cp, point, this.pos);
+        output[0] = this.pos[0];
+        output[1] = this.pos[1];
+        for (var i = 0; i < 2; i++) {
+            var l = vec2.dot(cp, this.axis[i]);
+            l = Math.min(this.radius[i], l);
+            l = Math.max(-this.radius[i], l);
+            vec2.addMultScalar(output, output, this.axis[i], l);
+        }
+        return true;
+    };
+
+    OBB.prototype.getContactPoints = function(output, index, normal, distance, other) {
+        if (other instanceof Circle) {
+            vec2.set(output[index].pB, other.pos[0] - normal[0] * other.radius, other.pos[1] - normal[1] * other.radius);
+            vec2.set(output[index].pA, output[index].pB[0] + normal[0] * -distance, output[index].pB[1] + normal[1] * -distance);
+            vec2.copy(output[index].normal, normal);
+            output[index].distance = distance;
+            output[index].a = this;
+            output[index].b = other;
+            output[index].impulse = 0;
+            return 1;
+        } else if (other instanceof OBB) {
+
+            var perp = Vec2();
+            vec2.perp(perp, normal);
+
+            // calculate support points (edge points for each body)
+            var dir = [-1, 1];
+            var supportsA = [Vec2(), Vec2(), Vec2(), Vec2()];
+            var supportsB = [Vec2(), Vec2(), Vec2(), Vec2()];
+            var projA = Vec2();
+            var projB = Vec2();
+            vec2.set(projA, null, null);
+            vec2.set(projB, null, null);
+
+            function getIntervalMinMax(proj, value) {
+                if (proj[0] == null || value > proj[0]) {
+                    proj[0] = value;
+                }
+                if (proj[1] == null || value < proj[1]) {
+                    proj[1] = value;
+                }
+            }
+
+            var i, p;
+
+            for (i = 0; i < 2 ; i++) {
+                vec2.set(supportsB[i], other.pos[0] - normal[0] * other.radius[0] + perp[0] * other.radius[0] * dir[i], other.pos[1] - normal[1] * other.radius[1] + perp[1] * other.radius[1] * dir[i]);
+                vec2.set(supportsA[i], this.pos[0] + normal[0] * this.radius[0] + perp[0] * this.radius[0] * dir[i], this.pos[1] + normal[1] * this.radius[1] + perp[1] * this.radius[1] * dir[i]);
+
+                p = vec2.dot(supportsA[i], perp);
+                getIntervalMinMax(projA, p);
+                p = vec2.dot(supportsB[i], perp);
+                getIntervalMinMax(projB, p);
+            }
+
+            // Get support points C and D - projection from other side
+            for (i = 0; i < 2 ; i++) {
+                var v = Vec2();
+
+                vec2.sub(v, supportsB[i], supportsA[i]);
+                p = vec2.dot(v, perp);
+                vec2.set(supportsA[i+2], supportsA[i][0] + perp[0] * p, supportsA[i][1] + perp[1] * p);
+
+                vec2.sub(v, supportsA[i], supportsB[i]);
+                p = vec2.dot(v, perp);
+                vec2.set(supportsB[i+2], supportsB[i][0] + perp[0] * p, supportsB[i][1] + perp[1] * p);
+            }
+
+            // Distance between each support point
+
+            // Project distance it on the normal - support point for the other body (Support C and D)
+
+            // Project the actual support points along the tangent and get min/max proj for both bodies
+
+            // We want only the support points which arent greater than min and smaller than max for both bodies#
+
+            var smallest = 0;
+            var smallestIndex = -1;
+            var biggest = 0;
+            var biggestIndex = -1;
+            for (i = 0; i < 4 ; i++) {
+                var sA = vec2.dot(supportsA[i], perp);
+
+                if (smallestIndex == -1 || sA < smallest) {
+                    smallest = sA;
+                    smallestIndex = i;
+                }
+                if (biggestIndex == -1 || sA > biggest) {
+                    biggest = sA;
+                    biggestIndex = i;
+                }
+            }
+
+            if (!(projB[0] < projA[1] || projB[1] > projA[0])) {
+                var a = [smallestIndex, biggestIndex];
+                for (i = 0; i < 2; i++) {
+                    vec2.copy(output[index+i].pA, supportsB[a[i]]);
+                    vec2.set(output[index+i].pB, output[index+i].pA[0] + normal[0] * -distance, output[index+i].pA[1] + normal[1] * -distance);
+                    vec2.copy(output[index+i].normal, normal);
+                    output[index+i].distance = distance;
+                    output[index+i].a = this;
+                    output[index+i].b = other;
+                    output[index+i].impulse = 0;
+                }
+
+                return 2;
+            } else {
+                var closestA = Vec2();
+                var closestB = Vec2();
+                other.getClosestPoint(closestA, this.pos);
+                this.getClosestPoint(closestB, closestA);
+                vec2.copy(output[index].pA, closestA);
+                vec2.copy(output[index].pB, closestB);
+                vec2.copy(output[index].normal, normal);
+                output[index].distance = distance;
+                output[index].a = this;
+                output[index].b = other;
+                output[index].impulse = 0;
+                return 1;
+            }
+
+
+            /*
+
+             Vertex-Vertex contact (Normal not 90° degrees - Vertex voronoi):
+
+             A            B
+             |------------|
+             |----------------|
+             C                D
+
+             -> x (contact)
+
+             Edge-Edge contacts:
+
+             A            B
+             |------------|
+             |----------------|
+             C                D
+
+             -> x-------x (contacts)
+             C       B
+
+
+
+             A            B
+             |------------|
+             |----------------|
+             C                D
+
+             -> x------------x (contacts)
+             A            B
+
+
+
+             A            B
+             |------------|
+             |----------------|
+             C                D
+
+             -> x-----x (contacts)
+             A     D
+
+             */
+        }
+        return 0;
+    };
+
+    OBB.prototype.draw = function (r, color, ox, oy) {
+        r.push();
+        r.translate((ox || 0) + this.pos[0], (oy || 0) + this.pos[1]);
+        r.rotate(-this.rotation);
+        r.strokeRect(-this.radius[0], -this.radius[1], this.radius[0] * 2, this.radius[1] * 2, color, 2);
+        r.pop();
+    };
+
+    function Circle(pos, radius, mass, color) {
+        Body.call(this, pos, mass * radius);
+        this.radius = radius;
+        this.color = color;
+    }
+
+    Circle.extends(Body);
+
+    Circle.prototype.getBounds = function (output, ox, oy) {
+        output[0] = (ox || 0) + this.pos[0] - this.radius;
+        output[1] = (oy || 0) + this.pos[1] - this.radius;
+        output[2] = (ox || 0) + this.pos[0] + this.radius;
+        output[3] = (oy || 0) + this.pos[1] + this.radius;
+    };
+
+    Circle.prototype.getAxis = function (other) {
+        var closestPoint = Vec2();
+        if (other.getClosestPoint(closestPoint, this.pos)) {
+            var axis = Vec2();
+            vec2.sub(axis, closestPoint, this.pos);
+            if (vec2.lengthSquared(axis) > 0) {
+                vec2.normalize(axis, axis);
+                return [axis];
+            } else {
+                return [];
+            }
+        }
+        return [];
+    };
+
+    Circle.prototype.project = function (output, axis) {
+        output[0] = -this.radius;
+        output[1] = this.radius;
+    };
+
+    Circle.prototype.getClosestPoint = function (output, point) {
+        var distanceVec = Vec2();
+        vec2.sub(distanceVec, point, this.pos);
+        var distanceNormal = Vec2();
+        vec2.normalize(distanceNormal, distanceVec);
+        output[0] = this.pos[0] + distanceNormal[0] * this.radius;
+        output[1] = this.pos[1] + distanceNormal[1] * this.radius;
+        return true;
+    };
+
+    Circle.prototype.getContactPoints = function (output, index, normal, distance, other) {
+        if (other instanceof Circle) {
+            vec2.set(output[index].pA, this.pos[0] + normal[0] * this.radius, this.pos[1] + normal[1] * this.radius);
+            vec2.set(output[index].pB, other.pos[0] - normal[0] * other.radius, other.pos[1] - normal[1] * other.radius);
+            vec2.copy(output[index].normal, normal);
+            output[index].distance = distance;
+            output[index].a = this;
+            output[index].b = other;
+            output[index].impulse = 0;
+        } else {
+            vec2.set(output[index].pA, this.pos[0] + normal[0] * this.radius, this.pos[1] + normal[1] * this.radius);
+            vec2.set(output[index].pB, this.pos[0] - normal[0] * (-distance - this.radius), this.pos[1] - normal[1] * (-distance - this.radius));
+            vec2.copy(output[index].normal, normal);
+            output[index].distance = distance;
+            output[index].a = this;
+            output[index].b = other;
+            output[index].impulse = 0;
+        }
+        return 1;
+    };
+
+    Circle.prototype.draw = function (r, color, ox, oy) {
+        r.strokeArc((ox || 0) + this.pos[0], (oy || 0) + this.pos[1], this.radius, color, 1);
+        r.fillArc((ox || 0) + this.pos[0], (oy || 0) + this.pos[1], this.radius * 0.6, color);
+    };
+
+    function Contact() {
+        this.a = null;
+        this.b = null;
+        this.pA = Vec2();
+        this.pB = Vec2();
+        this.normal = Vec2();
+        this.distance = 0;
+        this.impulse = 0;
+    }
+
+    function PhysicsEngine() {
+        this.bodies = [];
+        this.bodyCount = 0;
+
+        this.maxCollisionPairs = 10000;
+        this.collisionPairs = (Array.apply(null, new Array(this.maxCollisionPairs))).map(function (x, i) {
+            return {a: null, b: null};
+        });
+        this.collisionPairCount = 0;
+
+
+        this.maxContacts = 10000;
+        this.contacts = (Array.apply(null, new Array(this.maxContacts))).map(function (x, i) {
+            return new Contact();
+        });
+        this.contactCount = 0;
+
+        this.solverIterations = 4;
+        this.solverType = 3;
+        this.solvedContacts = 0;
+
+        this.boundsA = Bounds();
+        this.boundsB = Bounds();
+    }
+
+    PhysicsEngine.prototype.clear = function() {
+        for (var i = 0; i < this.bodyCount; i++) {
+            this.bodies[i] = null;
+        }
+        this.bodyCount = 0;
+    };
+
+    PhysicsEngine.prototype.addBody = function (body) {
+        this.bodies[this.bodyCount++] = body;
+        return body;
+    };
+
+    PhysicsEngine.prototype.toggleSolver = function () {
+        this.solverType++;
+        if (this.solverType > 3) {
+            this.solverType = 0;
+        }
+    };
+
+    PhysicsEngine.prototype.incIteration = function (cnt) {
+        this.solverIterations += cnt;
+        if (this.solverIterations < 1) {
+            this.solverIterations = 1;
+        } else if (this.solverIterations > 10) {
+            this.solverIterations = 10;
+        }
+    };
+
+    PhysicsEngine.prototype.getSolverName = function () {
+        switch (this.solverType) {
+            case 0:
+                return "Discrete";
+            case 1:
+                return "Discrete sequential";
+            case 2:
+                return "Speculative";
+            case 3:
+                return "Speculative sequential";
+            default:
+                return "Unknown " + this.solverType;
+        }
+    };
+
+    PhysicsEngine.prototype.broadphase = function (dt) {
+        this.collisionPairCount = 0;
+        var count = this.bodyCount;
+        for (var i = 0; i < count - 1; i++) {
+            for (var j = i + 1; j < count; j++) {
+                var bodyA = this.bodies[i];
+                var bodyB = this.bodies[j];
+                if (bodyA.invMass != 0 || bodyB.invMass != 0) {
+                    bodyA.getVelocityBounds(this.boundsA, dt);
+                    bodyB.getVelocityBounds(this.boundsB, dt);
+                    if (bounds.intersectsWith(this.boundsA, this.boundsB)) {
+                        this.collisionPairs[this.collisionPairCount].a = bodyA;
+                        this.collisionPairs[this.collisionPairCount].b = bodyB;
+                        this.collisionPairCount++;
+                    }
+                }
+            }
+        }
+    };
+
+    PhysicsEngine.prototype.createContacts = function (bodyA, bodyB) {
+        // Get axis
+        var axis = [];
+        axis.push.apply(axis, bodyA.getAxis(bodyB));
+        axis.push.apply(axis, bodyB.getAxis(bodyA));
+
+        // Get relative offset between A and B (Treat A as stationary)
+        var relOffset = Vec2();
+        vec2.sub(relOffset, bodyB.pos, bodyA.pos);
+
+        // Get relative velocity between A and B (Treat A as stationary)
+        var relVel = Vec2();
+        vec2.sub(relVel, bodyB.vel, bodyA.vel);
+
+        if (vec2.lengthSquared(relVel) > 0) {
+            var velNormal = Vec2();
+            vec2.normalize(velNormal, relVel);
+            axis.push(velNormal);
+        }
+
+        // Find smallest collision normal and distance
+        var collisionNormal = Vec2();
+        var collisionDistance = null;
+        var index = -1;
+        for (var j = 0; j < axis.length; j++) {
+            var n = axis[j];
+
+            var projA = Vec2();
+            var projB = Vec2();
+            bodyA.project(projA, n);
+            bodyB.project(projB, n);
+
+            vec2.addScalar(projB, projB, vec2.dot(n, relOffset));
+
+            var d0 = projA[0] - projB[1];
+            var d1 = projB[0] - projA[1];
+            var overlap = d0 > d1 ? d0 : d1;
+
+            if (index == -1 || overlap > collisionDistance) {
+                index = j;
+                collisionDistance = overlap;
+                vec2.copy(collisionNormal, n);
+            }
+        }
+
+        if (index > -1) {
+            // Make sure the collision normal is always pushing away
+            if (vec2.dot(collisionNormal, relOffset) < 0) {
+                vec2.multScalar(collisionNormal, collisionNormal, -1);
+            }
+
+            // Really important: Normal needs to be to flipped for contact normal
+            vec2.multScalar(collisionNormal, collisionNormal, -1);
+
+            // Calculate contact points
+            this.contactCount += bodyB.getContactPoints(this.contacts, this.contactCount, collisionNormal, collisionDistance, bodyA);
+        }
+    };
+
+    PhysicsEngine.prototype.narrowphase = function (dt) {
+        // Generate contact pairs
+        this.contactCount = 0;
+        var pairCount = this.collisionPairCount;
+        for (var i = 0; i < pairCount; i++) {
+            var bodyA = this.collisionPairs[i].a;
+            var bodyB = this.collisionPairs[i].b;
+            this.createContacts(bodyA, bodyB);
+        }
+    };
+
+    PhysicsEngine.prototype.solveContact = function (contactPair, dt) {
+        var bodyA = contactPair.a;
+        var bodyB = contactPair.b;
+
+        // get relative velocity and project it onto the normal
+        var normal = contactPair.normal;
+        var relVel = Vec2();
+        vec2.sub(relVel, bodyB.vel, bodyA.vel);
+        var projVel = vec2.dot(relVel, normal);
+
+        var imp = 0;
+        var remove, mag, newImpulse;
+        if (this.solverType == 0) {
+            // remove all of it + resolve penetration over the course of some frames
+            remove = projVel + 0.4 * (contactPair.distance + 1) / dt;
+
+            // but only when objects are intersecting and moving towards each other
+            if (remove < 0 && contactPair.distance < 0) {
+                // compute impulse
+                imp = remove / (bodyA.invMass + bodyB.invMass);
+
+                // apply impulse
+                bodyA.addImpulse(normal, imp);
+                bodyB.addImpulse(normal, -imp);
+                this.solvedContacts++;
+            }
+        } else if (this.solverType == 1) {
+            if (contactPair.distance < 0) {
+                // only remove negative relative normal velocity - use accumulated impulses to solve globally
+                remove = projVel + 0.4 * (contactPair.distance + 1) / dt;
+                mag = remove / (bodyA.invMass + bodyB.invMass);
+                newImpulse = Math.min(mag + contactPair.impulse, 0);
+
+                // accumulate
+                imp = newImpulse - contactPair.impulse;
+
+                // apply impulse
+                bodyA.addImpulse(normal, imp);
+                bodyB.addImpulse(normal, -imp);
+
+                // Save new impulse on contact pair for next iteration
+                contactPair.impulse = newImpulse;
+
+                this.solvedContacts++;
+            }
+        } else if (this.solverType == 2) {
+            // we want to remove only the amount which leaves them touching next frame
+            remove = projVel + contactPair.distance / dt;
+            if (remove < 0) {
+                // compute impulse
+                imp = remove / (bodyA.invMass + bodyB.invMass);
+
+                // apply impulse
+                bodyA.addImpulse(normal, imp);
+                bodyB.addImpulse(normal, -imp);
+                this.solvedContacts++;
+            }
+        } else if (this.solverType == 3) {
+            // we want to remove only the amount which leaves them touching next frame
+            remove = projVel + contactPair.distance / dt;
+
+            // compute impulse magnitude
+            mag = remove / (bodyA.invMass + bodyB.invMass);
+
+            // accumulate
+            newImpulse = Math.min(mag + contactPair.impulse, 0);
+
+            // compute final impulse
+            imp = newImpulse - contactPair.impulse;
+
+            // apply impulse
+            bodyA.addImpulse(normal, imp);
+            bodyB.addImpulse(normal, -imp);
+
+            // Save new impulse on contact pair for next iteration
+            contactPair.impulse = newImpulse;
+
+            this.solvedContacts++;
+        }
+
+    };
+
+    PhysicsEngine.prototype.solve = function (dt) {
+        // Resolve contacts
+        this.solvedContacts = 0;
+        for (var i = 0; i < this.solverIterations; i++) {
+            for (var j = 0; j < this.contactCount; j++) {
+                this.solveContact(this.contacts[j], dt);
+            }
+        }
+    };
+
+    PhysicsEngine.prototype.integrate = function (dt) {
+        for (var i = 0; i < this.bodyCount; i++) {
+            if (this.bodies[i].invMass != 0) {
+                this.bodies[i].update(dt);
+            }
+        }
+    };
+
+    PhysicsEngine.prototype.update = function (dt) {
+        this.broadphase(dt);
+        this.narrowphase(dt);
+        this.solve(dt);
+        this.integrate(dt);
+    };
+
+    function PhysicsEngineDemo(canvas) {
+        this.canvas = canvas;
+        this.renderer = new Canvas2DRenderer(canvas);
+        this.viewport = [0, 0, canvas.width, canvas.height];
+
+        var that = this;
+
+        // Disable selection
+        this.canvas.onselectstart = function () {
+            return false;
+        };
+
+        // Add key listeners
+        this.keystate = [];
+        this.canvas.addEventListener("keydown", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = true;
+        }, false);
+        this.canvas.addEventListener("keyup", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = false;
+            console.log(e.keyCode ? e.keyCode : e.which);
+        }, false);
+
+        // A wrapper to convert client to view coords
+        var updatePos = function (pos, x, y) {
+            pos[0] = (x - that.canvas.getBoundingClientRect().left) * (that.canvas.width / that.canvas.offsetWidth);
+            pos[1] = (y - that.canvas.getBoundingClientRect().top) * (that.canvas.height / that.canvas.offsetHeight);
+        };
+        this.mouse = Vec2();
+        this.mousestate = [];
+        this.canvas.addEventListener("mousedown", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+            that.mousestate[e.button] = true;
+        }, false);
+        this.canvas.addEventListener("mousemove", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+        }, false);
+        this.canvas.addEventListener("mouseup", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+            that.mousestate[e.button] = false;
+        }, false);
+        this.canvas.addEventListener("mouseout", function (e) {
+            that.mouse.x = -1;
+            that.mouse.y = -1;
+        }, false);
+
+        this.physics = new PhysicsEngine();
+
+        this.showVelocity = false;
+        this.showContacts = false;
+
+        this.nextRadius = 4;
+        this.nextType = 0;
+        this.nextMass = 50;
+
+        this.osdActive = false;
+        this.osd = "";
+        this.osdTime = 0;
+    }
+
+    PhysicsEngineDemo.prototype.addBlob = function(pos, ext, rad, type, mass, color) {
+        var r = rad + (rad * 0.1);
+        var halfX = ext[0] * r;
+        var halfY = ext[1] * r;
+        for (var y = 0; y < ext[1]; y++) {
+            for (var x = 0; x < ext[0]; x++) {
+                var px = (pos[0] - halfX) + x * r * 2 + Math.random()*r*0.01;
+                var py = (pos[1] - halfY) + y * r * 2 - Math.random()*r*0.01;
+                if (type == 0) {
+                    this.physics.addBody(new Circle(Vec2(px, py), rad, mass, color));
+                } else {
+                    this.physics.addBody(new OBB(Vec2(px, py), Vec2(rad, rad), mass, color));
+                }
+            }
+        }
+    };
+
+    PhysicsEngineDemo.prototype.loadScenario = function() {
+        this.physics.clear();
+        this.physics.addBody(new OBB(Vec2(0, 110), Vec2(210, 20), 0, "aqua"));
+        this.physics.addBody(new OBB(Vec2(-200, 40), Vec2(10, 50), 0, "green")).rotate(25);
+        this.physics.addBody(new OBB(Vec2(200, 40), Vec2(10, 50), 0, "green")).rotate(-25);
+        this.physics.addBody(new OBB(Vec2(220, -50), Vec2(10, 50), 0, "darkgreen"));
+        this.physics.addBody(new OBB(Vec2(-220, -50), Vec2(10, 50), 0, "darkgreen"));
+        this.physics.addBody(new OBB(Vec2(150, 80), Vec2(50, 10), 0, "yellow")).rotate(25);
+        this.physics.addBody(new OBB(Vec2(-150, 80), Vec2(50, 10), 0, "yellow")).rotate(-25);
+        var r = 6;
+        var m = 15;
+        this.addBlob(Vec2(0, -100), Vec2(10, 10), r, 0, m, "blue");
+    };
+
+    PhysicsEngineDemo.prototype.initGame = function (r) {
+        r.setFont("arial", 11, "normal");
+        this.loadScenario();
+    };
+
+    PhysicsEngineDemo.prototype.showOSD = function(text) {
+        this.osd = text;
+        this.osdActive = true;
+        this.osdTime = 3000;
+    };
+
+    PhysicsEngineDemo.prototype.handleInput = function () {
+        // Handle input
+        if (this.isKeyDown(Keys.V)) {
+            this.showVelocity = !this.showVelocity;
+            this.setKeyDown(Keys.V, false);
+        }
+        if (this.isKeyDown(Keys.C)) {
+            this.showContacts = !this.showContacts;
+            this.setKeyDown(Keys.C, false);
+        }
+        if (this.isKeyDown(Keys.Space)) {
+            this.physics.toggleSolver();
+            this.showOSD("Changed to " + this.physics.getSolverName() + " contact solver");
+            this.setKeyDown(Keys.Space, false);
+        }
+        if (this.isKeyDown(Keys.PageUp)) {
+            this.physics.incIteration(1);
+            this.showOSD("Changed solver iteration to " + this.physics.solverIterations);
+            this.setKeyDown(Keys.PageUp, false);
+        } else if (this.isKeyDown(Keys.PageDown)) {
+            this.physics.incIteration(-1);
+            this.showOSD("Changed solver iteration to " + this.physics.solverIterations);
+            this.setKeyDown(Keys.PageDown, false);
+        }
+        if (this.isKeyDown(Keys.R)) {
+            this.loadScenario();
+            this.setKeyDown(Keys.R, false);
+        }
+
+        // On left mouse button create a body on mouse position
+        if (this.isMouseDown(0)) {
+            this.addBlob(Vec2(this.mouse[0] - this.viewport[2] * 0.5, this.mouse[1] - this.viewport[3] * 0.5), Vec2(5, 5), this.nextRadius, this.nextType, this.nextMass, "red");
+            this.setMouseButton(0, false);
+        }
+    };
+
+    PhysicsEngineDemo.prototype.update = function (dt) {
+        // Increase osd time
+        if (this.osdActive) {
+            if (this.osdTime > 0) {
+                this.osdTime -= dt * 1000;
+            } else {
+                this.osdTime = 0;
+                this.osdActive = false;
+            }
+        }
+
+        // Handle input
+        this.handleInput();
+
+        // Add gravity to all dynamic bodies
+        for (var i = 0; i < this.physics.bodyCount; i++) {
+            var body = this.physics.bodies[i];
+            if (body.invMass != 0) {
+                body.addForce(0, 9.81 * 50);
+            }
+        }
+
+        // Update physics
+        this.physics.update(dt);
+    };
+
+    PhysicsEngineDemo.prototype.draw = function (r, v, dt) {
+        r.clear();
+        r.fillRect(v[0], v[1], v[2], v[3], "black");
+        r.push();
+        r.translate(v[2] * 0.5, v[3] * 0.5);
+
+        var i;
+
+        // Draw bodies
+        for (i = 0; i < this.physics.bodyCount; i++) {
+            var body = this.physics.bodies[i];
+            body.draw(r, body.color);
+        }
+
+        // Draw bodies velocity
+        if (this.showVelocity) {
+            for (i = 0; i < this.physics.bodyCount; i++) {
+                var body = this.physics.bodies[i];
+
+                // Draw velocity bounds
+                var velBounds = Bounds();
+                body.getVelocityBounds(velBounds, dt);
+
+                r.strokeRect(velBounds[0], velBounds[1], velBounds[2] - velBounds[0], velBounds[3] - velBounds[1], "aqua");
+            }
+        }
+
+        // Go through all contact pairs
+        if (this.showContacts) {
+            for (i = 0; i < this.physics.contactCount; i++) {
+                var contactPair = this.physics.contacts[i];
+                var contactA = contactPair.pA;
+                var contactB = contactPair.pB;
+                r.fillArc(contactA[0], contactA[1], 2, "red");
+                //r.fillArc(contactB[0], contactB[1], 2, "orange");
+            }
+        }
+
+        // Shows ghost ball
+        r.strokeArc(this.mouse[0] - v[2] * 0.5, this.mouse[1] - v[3] * 0.5, 4, "red");
+
+        if (this.osdActive) {
+            r.setFont("arial", 24, "normal");
+            r.text(0, -50, this.osd, "white", "center", "middle");
+        }
+
+        r.pop();
+
+        r.setFont("arial", 11, "bold");
+        r.text(10, 10, this.physics.getSolverName() + " solver - " + this.physics.solverIterations + " iterations", "yellow");
+
+        r.setFont("arial", 11, "normal");
+        r.text(10, 24, "Objects: " + this.physics.bodyCount, "white");
+        r.text(10, 38, "Contacts: " + this.physics.contactCount, "white");
+        r.text(10, 52, "Solved contacts: " + this.physics.solvedContacts, "white");
+        r.text(10, 320, "Keys: ", "white");
+        r.text(10, 330, "Space: Toggle solver", "white");
+        r.text(10, 340, "V: Show/Hide velocity bounds", "white");
+        r.text(10, 350, "C: Show/Hide contacts", "white");
+        r.text(10, 360, "Page up/down: Increase/Decrease solver iterations", "white");
+    };
+
+    PhysicsEngineDemo.prototype.run = function () {
+        var r = new Canvas2DRenderer(this.canvas);
+        var v = this.viewport;
+        var that = this;
+        var last = 0;
+        var dt = (1 / 60);
+        var oneSec = 1 / 1000;
+        var accum = 0;
+        this.initGame(r);
+        (function gameLoop(msecs) {
+            window.requestAnimationFrame(gameLoop);
+
+            var now = msecs !== undefined ? msecs : 0;
+            var delta = (now - last) * oneSec;
+            last = now;
+            accum += delta;
+
+            while (accum >= dt) {
+                that.update(dt);
+                accum -= dt;
+            }
+
+            that.draw(r, v, dt);
+        })(0);
+    };
+
+    PhysicsEngineDemo.prototype.isKeyDown = function (key) {
+        return typeof this.keystate[key] != "undefined" && this.keystate[key] == true;
+    };
+
+    PhysicsEngineDemo.prototype.setKeyDown = function (key, value) {
+        this.keystate[key] = value;
+    };
+
+    PhysicsEngineDemo.prototype.isMouseDown = function (button) {
+        return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+    };
+
+    PhysicsEngineDemo.prototype.setMouseButton = function (button, value) {
+        this.mousestate[button] = value;
+    };
+
+    return PhysicsEngineDemo;
+})();
+</script>
+</head>
+<body>
+<canvas id="canvas" width="600" height="400" tabindex="1"></canvas>
+<script type="text/javascript">
+    var game = new ContactGenGame(document.getElementById("canvas"));
+    game.run();
+</script>
+</body>
+</html>

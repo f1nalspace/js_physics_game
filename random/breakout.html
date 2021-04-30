@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Breakout</title>
+<style type="text/css">
+    html, body {
+        margin: 0;
+        overflow: hidden;
+    }
+
+    canvas {
+    }
+</style>
+<script type="text/javascript">
+var BreakoutGame = (function () {
+    Function.prototype.extends = function (b) {
+        var d = this;
+        for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+        function __() {
+            this.constructor = d;
+        }
+
+        __.prototype = b.prototype;
+        d.prototype = new __();
+    };
+
+    var Keys = {
+        Space: 32,
+        Left: 37,
+        Right: 39
+    };
+
+    function Canvas2DRenderer(canvas) {
+        var c = canvas;
+        var r = canvas.getContext("2d");
+        return {
+            clear: function () {
+                r.clearRect(0, 0, c.width, c.height);
+            },
+            fillRect: function (x, y, w, h, color) {
+                r.fillStyle = color;
+                r.fillRect(x, y, w, h);
+            },
+            strokeRect: function (x, y, w, h, color, width) {
+                r.lineWidth = width || 1;
+                r.strokeStyle = color;
+                r.strokeRect(x, y, w, h);
+                r.lineWidth = 1;
+            },
+            fillArc: function (x, y, rad, color) {
+                r.fillStyle = color;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.fill();
+            },
+            strokeArc: function (x, y, rad, color, width) {
+                r.lineWidth = width || 1;
+                r.strokeStyle = color;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.stroke();
+                r.lineWidth = 1;
+            },
+            line: function (x0, y0, x1, y1, color, width) {
+                r.lineWidth = width || 1;
+                r.strokeStyle = color;
+                r.beginPath();
+                r.moveTo(x0, y0);
+                r.lineTo(x1, y1);
+                r.stroke();
+                r.lineWidth = 1;
+            },
+            translate: function(x, y) {
+                r.translate(x, y);
+            },
+            push: function() {
+                r.save();
+            },
+            pop: function() {
+                r.restore();
+            },
+            text: function (x, y, text, color, align, baseline) {
+                r.textAlign = align || "left";
+                r.textBaseline = baseline || "top";
+                r.fillStyle = color;
+                r.fillText(text, x, y);
+            }
+        };
+    }
+
+
+    function Vec2(x, y) {
+        return [x || 0, y || 0];
+    }
+
+    var vec2 = {
+        createArray: function (count) {
+            var v = new Array(count);
+            for (var i = 0; i < count; i++) {
+                v[i] = Vec2();
+            }
+            return v;
+        },
+        set: function (v, x, y) {
+            v[0] = x;
+            v[1] = y;
+        },
+        sub: function (v, a, b) {
+            v[0] = a[0] - b[0];
+            v[1] = a[1] - b[1];
+        },
+        add: function (v, a, b) {
+            v[0] = a[0] + b[0];
+            v[1] = a[1] + b[1];
+        },
+        copy: function (v, a) {
+            v[0] = a[0];
+            v[1] = a[1];
+        },
+        addScalar: function (v, a, scalar) {
+            v[0] = a[0] + scalar;
+            v[1] = a[1] + scalar;
+        },
+        addMultScalar: function (v, a, b, scalar) {
+            v[0] = a[0] + b[0] * scalar;
+            v[1] = a[1] + b[1] * scalar;
+        },
+        multScalar: function (v, a, scalar) {
+            v[0] = a[0] * scalar;
+            v[1] = a[1] * scalar;
+        },
+        zero: function (v) {
+            v[0] = 0;
+            v[1] = 0;
+        },
+        length: function (v) {
+            return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        },
+        lengthSqrt: function (v) {
+            return v[0] * v[0] + v[1] * v[1];
+        },
+        dot: function (a, b) {
+            return a[0] * b[0] + a[1] * b[1];
+        },
+        normalize: function (v, a) {
+            var l = Math.sqrt(a[0] * a[0] + a[1] * a[1]);
+            if (l == 0) {
+                l = 1;
+            }
+            v[0] = a[0] / l;
+            v[1] = a[1] / l;
+        },
+        perp: function (v, a) {
+            v[0] = -a[1];
+            v[1] = a[0];
+        },
+        reflect: function (result, velocity, normal, bounciness, friction) {
+            // Project velocity on line normal
+            var projVelocity = vec2.dot(velocity, normal);
+
+            // Impact velocity vector
+            var impactX = normal[0] * projVelocity;
+            var impactY = normal[1] * projVelocity;
+
+            // Tangent velocity vector (across the surface)
+            var tangentX = velocity[0] - impactX;
+            var tangentY = velocity[1] - impactY;
+
+            // Velocity for bounciness
+            var velBX = impactX * -bounciness;
+            var velBY = impactY * -bounciness;
+
+            // Velocity for friction
+            var velFX = tangentX * (1 - friction);
+            var velFY = tangentY * (1 - friction);
+
+            // Resulting velocity
+            result[0] = velBX + velFX;
+            result[1] = velBY + velFY;
+        }
+    };
+
+    function Bounds(x, y, w, h) {
+        return [x, y, w, h];
+    }
+
+    var bounds = {
+        right: function (b) {
+            return b[0] + b[2];
+        },
+        bottom: function (b) {
+            return b[1] + b[3];
+        },
+        intersectsWith: function (a, b) {
+            return (bounds.right(a) >= b[0] &&
+                    bounds.bottom(a) >= b[1]) && (a[0] <= bounds.right(b) && a[1] <= bounds.bottom(b));
+        }
+    };
+
+    function Body(game) {
+        this.game = game;
+        this.pos = Vec2();
+        this.vel = Vec2();
+        this.lastVel = Vec2();
+        this.force = Vec2();
+        this.axis = [];
+        this.drag = 0;
+    }
+
+    Body.prototype.getAxis = function (other) {
+        return this.axis;
+    };
+    Body.prototype.project = function (output, axis) {
+    };
+    Body.prototype.getClosestPoint = function (output, point) {
+    };
+    Body.prototype.update = function (dt) {
+        vec2.copy(this.lastVel, this.vel);
+        vec2.addMultScalar(this.vel, this.vel, this.force, dt);
+        vec2.multScalar(this.vel, this.vel, 1 - this.drag);
+        vec2.set(this.pos, this.pos[0] + (this.lastVel[0] + this.vel[0]) * 0.5 * dt, this.pos[1] + (this.lastVel[1] + this.vel[1]) * 0.5 * dt);
+        vec2.zero(this.force);
+    };
+    Body.prototype.draw = function (r) {
+    };
+    /**
+     * Get bounding rect
+     * @param [ox]
+     * @param [oy]
+     */
+    Body.prototype.bounds = function (ox, oy) {
+    };
+    Body.prototype.sweptBounds = function (dt) {
+        var a = this.bounds();
+        var c = this.bounds(this.vel[0] * dt * 2, this.vel[1] * dt * 2);
+        var l = Math.min(a[0], c[0]);
+        var t = Math.min(a[1], c[1]);
+        var r = Math.max(bounds.right(a), bounds.right(c));
+        var b = Math.max(bounds.bottom(a), bounds.bottom(c));
+        return Bounds(l, t, r - l, b - t);
+    };
+
+    function AABB(game) {
+        Body.call(this, game);
+        this.axis = [Vec2(1, 0), Vec2(0, 1)];
+        this.size = Vec2();
+    }
+
+    AABB.extends(Body);
+
+    AABB.prototype.bounds = function (ox, oy) {
+        return Bounds(this.pos[0] - this.size[0] * 0.5 + (ox || 0),
+                this.pos[1] - this.size[1] * 0.5 + (oy || 0),
+                this.size[0],
+                this.size[1]);
+    };
+
+    AABB.prototype.project = function (output, axis) {
+        var scale = Math.abs(vec2.dot(axis, this.axis[0])) * this.size[0] * 0.5 + Math.abs(vec2.dot(axis, this.axis[1])) * this.size[1] * 0.5;
+        output[0] = -scale;
+        output[1] = +scale;
+    };
+
+    AABB.prototype.getClosestPoint = function (output, point) {
+        for (var i = 0; i < 2; i++) {
+            var v = point[i];
+            v = Math.max(v, this.pos[i] - this.size[i]);
+            v = Math.min(v, this.pos[i] + this.size[i]);
+            output[i] = v;
+        }
+    };
+
+    function Circle(game) {
+        Body.call(this, game);
+        this.axis = [Vec2()];
+        this.radius = 0;
+    }
+
+    Circle.extends(Body);
+
+    Circle.prototype.bounds = function (ox, oy) {
+        return Bounds(this.pos[0] - this.radius + (ox || 0), this.pos[1] - this.radius + (oy || 0), this.radius * 2, this.radius * 2);
+    };
+
+    Circle.prototype.project = function (output, axis) {
+        output[0] = -this.radius;
+        output[1] = +this.radius;
+    };
+
+    Circle.prototype.getAxis = function (other) {
+        var closestPoint = Vec2();
+        other.getClosestPoint(closestPoint, this.pos);
+        vec2.sub(this.axis[0], closestPoint, this.pos);
+        vec2.normalize(this.axis[0], this.axis[0]);
+        return this.axis;
+    };
+
+    function Plane(n, d, l) {
+        this.normal = n;
+        this.distance = d;
+        this.length = l;
+    }
+
+    Plane.prototype.draw = function (r) {
+        var d = this.distance;
+        var n = this.normal;
+        var l = this.length;
+        var tangent = Vec2();
+        vec2.perp(tangent, n);
+        var x0 = n[0] * d - tangent[0] * l * 0.5;
+        var y0 = n[1] * d - tangent[1] * l * 0.5;
+        var x1 = n[0] * d + tangent[0] * l * 0.5;
+        var y1 = n[1] * d + tangent[1] * l * 0.5;
+        var cx = n[0] * d;
+        var cy = n[1] * d;
+        r.line(x0, y0, x1, y1, "yellow", 2);
+        r.line(cx, cy, cx + n[0] * 10, cy + n[1] * 10, "white", 2);
+    };
+
+    Plane.prototype.getClosestPoint = function (output, point) {
+        var n = this.normal;
+        var p1 = Vec2(n[0] * this.distance, n[1] * this.distance);
+        var p1c = Vec2();
+        vec2.sub(p1c, p1, point);
+        var d = vec2.dot(p1c, n);
+        output[0] = point[0] + n[0] * d;
+        output[1] = point[1] + n[1] * d;
+    };
+
+    function CollisionResult() {
+        this.normal = Vec2();
+        this.penetrationDepth = 0;
+        this.mtv = Vec2();
+    }
+
+    function CollisionSystem() {
+        this.maxAxis = 16;
+        this.axis = new Array(this.maxAxis);
+        for (var i = 0; i < this.maxAxis; i++) {
+            this.axis[i] = Vec2();
+        }
+        this.count = 0;
+    }
+
+    /**
+     * Returns zero when the given axis is separated or a negative value when there there is a overlap
+     * @param output
+     * @param bodyA
+     * @param bodyB
+     * @param axis
+     * @param relPos
+     * @param relVel
+     * @returns {number}
+     */
+    CollisionSystem.prototype.getSeparation = function(bodyA, bodyB, axis, relPos, relVel) {
+        var projA = Vec2();
+        var projB = Vec2();
+        bodyA.project(projA, axis);
+        bodyB.project(projB, axis);
+        vec2.addScalar(projB, projB, vec2.dot(axis, relPos));
+        var d0 = projA[0] - projB[1];
+        var d1 = projB[0] - projA[1];
+        if (d0 > 0 || d1 > 0) {
+            return 0;
+        } else {
+            return d0 > d1 ? d0 : d1;
+        }
+    };
+
+    /**
+     * @returns {boolean}
+     */
+    CollisionSystem.prototype.getBallPlaneCollision = function(output, ball, plane) {
+        var closest = Vec2();
+        plane.getClosestPoint(closest, ball.pos);
+        var closestDistance = Vec2();
+        vec2.sub(closestDistance, ball.pos, closest);
+        var distance = vec2.dot(closestDistance, plane.normal) - ball.radius;
+        if (distance < 0) {
+            output.mtv[0] = 0;
+            output.mtv[1] = 0;
+            output.penetrationDepth = 0;
+            vec2.copy(output.normal, plane.normal);
+            return true;
+        } else {
+            return false;
+        }
+    };
+
+    /**
+     *
+     * @param output
+     * @param bodyA
+     * @param bodyB
+     * @returns {boolean}
+     */
+    CollisionSystem.prototype.getCollision = function(output, bodyA, bodyB) {
+        this.count = 0;
+
+        if (bodyA instanceof Ball && bodyB instanceof Plane) {
+            return this.getBallPlaneCollision(output, bodyA, bodyB);
+        }
+
+        var axisA = bodyA.getAxis(bodyB);
+        var axisB = bodyB.getAxis(bodyA);
+
+        // Push A-axis to array
+        for (var i = 0; i < axisA.length; i++) {
+            if (this.count < this.maxAxis) {
+                vec2.copy(this.axis[this.count++], axisA[i]);
+            } else {
+                throw new Error("BodyA axis has reached max of " + this.maxAxis + " axis!");
+            }
+        }
+
+        // Push B-axis to array
+        for (var i = 0; i < axisB.length; i++) {
+            if (this.count < this.maxAxis) {
+                vec2.copy(this.axis[this.count++], axisB[i]);
+            } else {
+                throw new Error("BodyB axis has reached max of " + this.maxAxis + " axis!");
+            }
+        }
+
+        var relPos = Vec2();
+        vec2.sub(relPos, bodyB.pos, bodyA.pos);
+
+        var relVel = Vec2();
+        vec2.sub(relVel, bodyB.vel, bodyA.vel);
+
+        // Loop through all axis
+        var smallestOverlap = 0;
+        var smallestAxis = Vec2();
+        for (var i = 0; i < this.count; i++) {
+            // Get separation
+            var separation = this.getSeparation(bodyA, bodyB, this.axis[i], relPos, relVel);
+            if (separation === 0) {
+                // There is no collision
+                return false;
+            }
+
+            // Get smallest overlap
+            if (smallestOverlap == 0 || separation > smallestOverlap) {
+                smallestOverlap = separation;
+                smallestAxis = this.axis[i];
+            }
+        }
+
+        // Collision - calculate result
+        output.penetrationDepth = -smallestOverlap;
+        vec2.copy(output.normal, smallestAxis);
+        if (vec2.dot(smallestAxis, relPos) < 0) {
+            vec2.multScalar(output.normal, output.normal, -1);
+        }
+        vec2.multScalar(output.mtv, output.normal, output.penetrationDepth * 1.01);
+        return true;
+    };
+
+    function PaddleKeyboardController() {
+    }
+
+    PaddleKeyboardController.prototype.update = function (paddle) {
+        var g = paddle.game;
+        if (g.isKeyDown(Keys.Left)) {
+            paddle.force[0] += -2000 / paddle.drag;
+        } else if (g.isKeyDown(Keys.Right)) {
+            paddle.force[0] += 2000 / paddle.drag;
+        }
+    };
+
+    function Paddle(game) {
+        AABB.call(this, game);
+        this.controller = new PaddleKeyboardController();
+        this.drag = 0.25;
+    }
+
+    Paddle.extends(AABB);
+
+    Paddle.prototype.update = function (dt) {
+        this.controller.update(this);
+        AABB.prototype.update.call(this, dt);
+    };
+
+    Paddle.prototype.draw = function (r) {
+        r.fillRect(this.pos[0] - this.size[0] * 0.5, this.pos[1] - this.size[1] * 0.5, this.size[0], this.size[1], "white");
+    };
+
+    function Brick(game) {
+        AABB.call(this, game);
+        this.axis = [Vec2(1, 0), Vec2(0, 1)];
+        this.size = Vec2();
+        this.color = "white";
+        this.alive = true;
+    }
+
+    Brick.extends(AABB);
+
+    Brick.prototype.draw = function (r) {
+        r.fillRect(this.pos[0] - this.size[0] * 0.5, this.pos[1] - this.size[1] * 0.5, this.size[0], this.size[1], this.color);
+    };
+
+    function Ball(game) {
+        Circle.call(this, game);
+        this.color = "red";
+    }
+
+    Ball.extends(Circle);
+
+    Ball.prototype.update = function (dt) {
+        Circle.prototype.update.call(this, dt);
+    };
+
+    Ball.prototype.draw = function (r) {
+        r.fillArc(this.pos[0], this.pos[1], this.radius, this.color);
+    };
+
+    function Level(game, w, h, ox, oy, bw, bh, spacing) {
+        var v = game.viewport;
+
+        var totalW = w * (bw + spacing);
+        var offsetX = ox + v[2] * 0.5 - totalW * 0.5;
+        var offsetY = oy;
+
+        this.count = w * h;
+        this.bricks = [];
+        for (var y = 0; y < h; y++) {
+            for (var x = 0; x < w; x++) {
+                var brick = new Brick(game);
+                vec2.set(brick.size, bw, bh);
+                vec2.set(brick.pos, offsetX + x * (bw + spacing) + bw * 0.5, offsetY + y * (bh + spacing) + bh * 0.5 + spacing * 3);
+                brick.color = "rgb(" + (Math.random() * 255 | 0) + ", " + (Math.random() * 255 | 0) + ", " + (Math.random() * 255 | 0) + ")";
+                this.bricks[y * w + x] = brick;
+            }
+        }
+    }
+
+    Level.prototype.update = function (dt) {
+    };
+
+    Level.prototype.draw = function (r) {
+        for (var i = 0; i < this.count; i++) {
+            var brick = this.bricks[i];
+            if (!brick.alive) continue;
+            brick.draw(r);
+        }
+    };
+
+    function BreakoutGame(canvas) {
+        this.canvas = canvas;
+        this.renderer = new Canvas2DRenderer(canvas);
+        this.viewport = [0, 0, 640, 360];
+        this.collisionSystem = new CollisionSystem();
+
+        var that = this;
+
+        // Add key listeners
+        this.keystate = [];
+        this.canvas.addEventListener("keydown", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = true;
+        }, false);
+        this.canvas.addEventListener("keyup", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = false;
+        }, false);
+
+        this.paddle = null;
+        this.level = null;
+        this.ball = null;
+        this.planes = [];
+    }
+
+    BreakoutGame.prototype.initGame = function () {
+        var v = this.viewport;
+
+        this.paddle = new Paddle(this);
+        vec2.set(this.paddle.size, 64, 16);
+        vec2.set(this.paddle.pos, 0, v[3] * 0.5 - this.paddle.size[1] * 1.5);
+
+        this.level = new Level(this, 8, 4, -v[2] * 0.5, -v[3] * 0.5, 64, 20, 8);
+
+        this.ball = new Ball(this);
+        this.ball.radius = 10;
+        vec2.set(this.ball.pos, 0, 100);
+        vec2.zero(this.ball.force);
+
+        var ballDir = Vec2(-0.9 + (Math.random() * 1.8), -1);
+        var ballSpeed = 100;
+        vec2.set(this.ball.vel, ballDir[0] * ballSpeed, ballDir[1] * ballSpeed);
+
+        this.planes = [
+            new Plane(Vec2(-1.0, 0.0), -v[2] * 0.48, v[3]),
+            new Plane(Vec2(1.0, 0.0), -v[2] * 0.48, v[3]),
+            new Plane(Vec2(0.0, 1.0), -v[3] * 0.48, v[2]),
+            new Plane(Vec2(0.0, -1.0), -v[3] * 0.5, v[2])
+        ];
+    };
+
+    BreakoutGame.prototype.update = function (dt) {
+        var ball = this.ball;
+        var paddle = this.paddle;
+
+        // Integrate
+        this.paddle.update(dt);
+        this.level.update(dt);
+        ball.update(dt);
+
+        var ballSweptBound, i;
+
+        // Test and resolve collisions against ball and bricks
+        var collisionResult = new CollisionResult();
+        for (i = 0; i < this.level.count; i++) {
+            var brick = this.level.bricks[i];
+            if (!brick.alive) continue;
+
+            // Test swept-bounds first
+            var brickSweptBound = brick.sweptBounds(dt);
+            ballSweptBound = ball.sweptBounds(dt);
+            if (bounds.intersectsWith(brickSweptBound, ballSweptBound)) {
+                if (this.collisionSystem.getCollision(collisionResult, ball, brick)) {
+                    brick.alive = false;
+                    vec2.sub(ball.pos, ball.pos, collisionResult.mtv);
+                    vec2.reflect(ball.vel, ball.vel, collisionResult.normal, 1.0, 0.0);
+                }
+            }
+        }
+
+        // Test and resolve collisions against ball and paddle
+        var paddleSweptBound = paddle.sweptBounds(dt);
+        ballSweptBound = ball.sweptBounds(dt);
+        if (bounds.intersectsWith(paddleSweptBound, ballSweptBound)) {
+            if (this.collisionSystem.getCollision(collisionResult, ball, paddle)) {
+                vec2.sub(ball.pos, ball.pos, collisionResult.mtv);
+                vec2.reflect(ball.vel, ball.vel, collisionResult.normal, 1.0, 0.0);
+
+                if (collisionResult.normal[1] == 0 && Math.abs(collisionResult.normal[0]) > 0) {
+                    // Add a impulse on that ball based on the paddle velocity X
+                    var paddleVelAxis = Vec2();
+                    vec2.normalize(paddleVelAxis, paddle.vel);
+                    var paddleAcceleration = vec2.dot(paddleVelAxis, paddle.vel) * 1.01;
+                    vec2.addMultScalar(ball.vel, ball.vel, paddleVelAxis, paddleAcceleration);
+                } else {
+                    // Add a small impulse on that ball based on the paddle velocity X
+                    var paddleVelAxis = Vec2();
+                    vec2.normalize(paddleVelAxis, paddle.vel);
+                    var paddleAcceleration = vec2.dot(paddleVelAxis, paddle.vel) * 0.1;
+                    vec2.addMultScalar(ball.vel, ball.vel, paddleVelAxis, paddleAcceleration);
+                }
+            }
+        }
+
+        // Test boundary planes
+        for (i = 0; i < this.planes.length; i++) {
+            var plane = this.planes[i];
+            if (this.collisionSystem.getCollision(collisionResult, ball, plane)) {
+                //vec2.add(ball.pos, ball.pos, collisionResult.mtv);
+                vec2.reflect(ball.vel, ball.vel, collisionResult.normal, 1.0, 0.0);
+            }
+        }
+    };
+
+    BreakoutGame.prototype.draw = function (r, v) {
+        r.clear();
+        r.fillRect(v[0], v[1], v[2], v[3], "black");
+
+        r.push();
+        r.translate(v[2] * 0.5, v[3] * 0.5);
+        this.paddle.draw(r);
+        this.level.draw(r);
+        this.ball.draw(r);
+
+        var ball = this.ball;
+
+        for (var i = 0; i < this.planes.length; i++) {
+            var plane = this.planes[i];
+
+            plane.draw(r);
+
+            /*
+            var closest = Vec2();
+            plane.getClosestPoint(closest, this.ball.pos);
+            r.strokeArc(closest[0], closest[1], 5, "yellow");
+
+            var closestDistance = Vec2();
+            vec2.sub(closestDistance, ball.pos, closest);
+
+            var distance = vec2.dot(closestDistance, plane.normal) - this.ball.radius;
+            r.text(closest[0], closest[1], distance.toFixed(2), "white", "center", "middle");
+
+            var projVel = -vec2.dot(ball.vel, plane.normal);
+            if (projVel > distance) {
+                var time = distance / projVel;
+                var newVel = Vec2(ball.vel[0] * (1-time), ball.vel[1] * (1-time));
+
+                var target = Vec2();
+                vec2.add(target, ball.pos, newVel);
+                r.strokeArc(target[0], target[1], 5, "green");
+                r.text(target[0], target[1], plane.normal[0] + "," + plane.normal[1], "white");
+            }
+            */
+
+        }
+        r.pop();
+    };
+
+    BreakoutGame.prototype.run = function () {
+        var r = new Canvas2DRenderer(this.canvas);
+        var v = this.viewport;
+        var that = this;
+        var last = 0;
+        var dt = (1 / 60);
+        var oneSec = 1 / 1000;
+        var accum = 0;
+        this.initGame();
+
+        (function gameLoop(msecs) {
+            window.requestAnimationFrame(gameLoop);
+
+            var now = msecs !== undefined ? msecs : 0;
+            var delta = (now - last) * oneSec;
+            last = now;
+            accum += delta;
+
+            while (accum >= dt) {
+                that.update(dt);
+                accum -= dt;
+            }
+
+            that.draw(r, v);
+        })(0);
+    };
+
+    BreakoutGame.prototype.isKeyDown = function (key) {
+        return typeof this.keystate[key] != "undefined" && this.keystate[key] == true;
+    };
+
+    BreakoutGame.prototype.setKeyDown = function (key, value) {
+        this.keystate[key] = value;
+    };
+
+    return BreakoutGame;
+})();
+</script>
+</head>
+<body oncontextmenu="return false">
+<canvas id="canvas" width="640" height="360" tabindex="1"></canvas>
+<script type="text/javascript">
+    var game = new BreakoutGame(document.getElementById("canvas"));
+    game.run();
+</script>
+</body>
+</html>

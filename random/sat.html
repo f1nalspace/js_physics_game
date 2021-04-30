@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Collisions</title>
+<style type="text/css">
+    html, body {
+        margin: 0;
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 70%;
+    }
+</style>
+<script type="text/javascript">
+var CollisionsGame = (function () {
+    Function.prototype.extends = function (b) {
+        var d = this;
+        for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+        function __() {
+            this.constructor = d;
+        }
+
+        __.prototype = b.prototype;
+        d.prototype = new __();
+    };
+
+    var Keys = {
+        Space: 32,
+        Left: 37,
+        Right: 39
+    };
+
+    function Canvas2DRenderer(canvas) {
+        var c = canvas;
+        var r = canvas.getContext("2d");
+        return {
+            clear: function () {
+                r.clearRect(0, 0, c.width, c.height);
+            },
+            fillRect: function (x, y, w, h, color) {
+                r.fillStyle = color;
+                r.fillRect(x, y, w, h);
+            },
+            strokeRect: function (x, y, w, h, color, width) {
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.strokeRect(x, y, w, h);
+                r.lineWidth = 1;
+            },
+            fillArc: function (x, y, rad, color) {
+                r.fillStyle = color;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.fill();
+            },
+            strokeArc: function (x, y, rad, color, width) {
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.beginPath();
+                r.arc(x, y, rad, 0, Math.PI * 2, false);
+                r.closePath();
+                r.stroke();
+                r.lineWidth = 1;
+            },
+            line: function (x0, y0, x1, y1, color, width) {
+                r.strokeStyle = color;
+                r.lineWidth = width || 1;
+                r.beginPath();
+                r.moveTo(x0, y0);
+                r.lineTo(x1, y1);
+                r.stroke();
+                r.lineWidth = 1;
+            },
+            text: function (x, y, text, color, align, baseline) {
+                r.textAlign = align || "left";
+                r.textBaseline = baseline || "top";
+                r.fillStyle = color;
+                r.fillText(text, x, y);
+            },
+            push: function () {
+                r.save();
+            },
+            pop: function () {
+                r.restore();
+            },
+            translate: function (x, y) {
+                r.translate(x, y);
+            },
+            scale: function(x, y) {
+                r.scale(x,y);
+            },
+            setOpacity: function (v) {
+                r.globalAlpha = v;
+            },
+            resetOpacity: function () {
+                r.globalAlpha = 1;
+            }
+        };
+    }
+
+    function Bounds(l, t, r, b) {
+        return [l || 0, t || 0, r || 0, b || 0];
+    }
+
+    var bounds = {
+        combine: function (o, a, b) {
+            o[0] = a[0] < b[0] ? a[0] : b[0];
+            o[1] = a[1] < b[1] ? a[1] : b[1];
+            o[2] = a[2] > b[0] ? a[2] : b[2];
+            o[3] = a[3] > b[3] ? a[3] : b[3];
+        }
+    };
+
+    function Vec2(x, y) {
+        return [x || 0, y || 0];
+    }
+
+    var vec2 = {
+        createArray: function (count) {
+            var a = new Array(count);
+            for (var i = 0; i < count; i++) {
+                a[i] = Vec2();
+            }
+            return a;
+        },
+        set: function (v, x, y) {
+            v[0] = x;
+            v[1] = y;
+        },
+        add: function (v, a, b) {
+            v[0] = a[0] + b[0];
+            v[1] = a[1] + b[1];
+        },
+        addScalar: function (v, a, scalar) {
+            v[0] = a[0] + scalar;
+            v[1] = a[1] + scalar;
+        },
+        sub: function (v, a, b) {
+            v[0] = a[0] - b[0];
+            v[1] = a[1] - b[1];
+        },
+        mult: function (v, a, b) {
+            v[0] = a[0] * b[0];
+            v[1] = a[1] * b[1];
+        },
+        addMultScalar: function (v, a, b, scalar) {
+            v[0] = a[0] + b[0] * scalar;
+            v[1] = a[1] + b[1] * scalar;
+        },
+        multScalar: function (v, a, scalar) {
+            v[0] = a[0] * scalar;
+            v[1] = a[1] * scalar;
+        },
+        dot: function (a, b) {
+            return a[0] * b[0] + a[1] * b[1];
+        },
+        length: function (v) {
+            return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        },
+        lengthSquared: function (v) {
+            return v[0] * v[0] + v[1] * v[1];
+        },
+        normalize: function (v, a) {
+            var l = Math.sqrt(a[0] * a[0] + a[1] * a[1]);
+            if (l == 0) l = 1;
+            v[0] = a[0] / l;
+            v[1] = a[1] / l;
+        },
+        zero: function (v) {
+            v[0] = 0;
+            v[1] = 0;
+        },
+        perp: function (v, a) {
+            var ax = a[0];
+            var ay = a[1];
+            v[0] = -ay;
+            v[1] = ax;
+        },
+        copy: function (v, a) {
+            v[0] = a[0];
+            v[1] = a[1];
+        }
+    };
+
+    function Body(axis) {
+        this.axis = axis || [];
+        this.pos = Vec2();
+        this.vel = Vec2();
+    }
+
+    /**
+     *
+     * @param other [Body]
+     * @returns {array}
+     */
+    Body.prototype.getAxis = function (other) {
+        return this.axis;
+    };
+
+    Body.prototype.getClosestPoint = function (output, point) {
+        return false;
+    };
+
+    Body.prototype.project = function (output, axis) {
+    };
+
+    Body.prototype.getBounds = function (output) {
+    };
+
+    Body.prototype.pointInside = function(point) {
+        return false;
+    };
+
+    function Box(pos, radius, color) {
+        Body.call(this, [Vec2(1, 0), Vec2(0, 1)]);
+        this.pos = pos;
+        this.radius = radius;
+        this.color = color;
+    }
+
+    Box.extends(Body);
+
+    Box.prototype.getBounds = function (output) {
+        output[0] = this.pos[0] - this.radius[0];
+        output[1] = this.pos[1] - this.radius[1];
+        output[2] = this.pos[0] + this.radius[0];
+        output[3] = this.pos[1] + this.radius[1];
+    };
+
+    Box.prototype.getClosestPoint = function (output, point) {
+        for (var i = 0; i < 2; i++) {
+            var v = point[i];
+            v = Math.max(v, this.pos[i] - this.radius[i]);
+            v = Math.min(v, this.pos[i] + this.radius[i]);
+            output[i] = v;
+        }
+        return true;
+    };
+
+    Box.prototype.project = function (output, axis) {
+        var r = Math.abs(vec2.dot(axis, this.axis[0])) * this.radius[0] + Math.abs(vec2.dot(axis, this.axis[1])) * this.radius[1];
+        output[0] = -r;
+        output[1] = +r;
+    };
+
+    Box.prototype.draw = function (r, color, ox, oy) {
+        r.strokeRect((ox || 0) + this.pos[0] - this.radius[0], (oy || 0) + this.pos[1] - this.radius[1], this.radius[0] * 2, this.radius[1] * 2, color, 2);
+    };
+
+    Box.prototype.pointInside = function(point) {
+        return (
+                point[0] >= this.pos[0] - this.radius[0] &&
+                point[1] >= this.pos[1] - this.radius[1] &&
+                point[0] <= this.pos[0] + this.radius[0] &&
+                point[1] <= this.pos[1] + this.radius[1]
+                );
+    };
+
+    function Circle(pos, radius, color) {
+        Body.call(this);
+        this.pos = pos;
+        this.radius = radius;
+        this.color = color;
+    }
+
+    Circle.extends(Body);
+
+    Circle.prototype.getBounds = function (output) {
+        output[0] = this.pos[0] - this.radius;
+        output[1] = this.pos[1] - this.radius;
+        output[2] = this.pos[0] + this.radius;
+        output[3] = this.pos[1] + this.radius;
+    };
+
+    Circle.prototype.project = function (output, axis) {
+        output[0] = -this.radius;
+        output[1] = this.radius;
+    };
+
+    Circle.prototype.getAxis = function (other) {
+        var closestPoint = Vec2();
+        if (other.getClosestPoint(closestPoint, this.pos)) {
+            var axis = Vec2();
+            vec2.sub(axis, closestPoint, this.pos);
+            if (vec2.lengthSquared(axis) > 0) {
+                vec2.normalize(axis, axis);
+                return [axis];
+            } else {
+                return [];
+            }
+        }
+        return [];
+    };
+
+    Circle.prototype.draw = function (r, color, ox, oy) {
+        r.strokeArc((ox || 0) + this.pos[0], (oy || 0) + this.pos[1], this.radius, color, 2);
+    };
+
+    Circle.prototype.pointInside = function(point) {
+        var v = Vec2();
+        vec2.sub(v, point, this.pos);
+        var l = vec2.lengthSquared(v);
+        return l < this.radius * this.radius;
+    };
+
+    function CollisionResult() {
+        this.normal = Vec2();
+        this.penetrationDepth = 0;
+        this.mtv = Vec2();
+    }
+
+    function CollisionSystem() {
+        this.maxAxis = 16;
+        this.axis = new Array(this.maxAxis);
+        for (var i = 0; i < this.maxAxis; i++) {
+            this.axis[i] = Vec2();
+        }
+        this.count = 0;
+    }
+
+    /**
+     * Returns zero when the given axis is separated or a negative value when there there is a overlap
+     * @param output
+     * @param bodyA
+     * @param bodyB
+     * @param axis
+     * @param relPos
+     * @param relVel
+     * @returns {number}
+     */
+    CollisionSystem.prototype.getSeparation = function(bodyA, bodyB, axis, relPos, relVel) {
+        var projA = Vec2();
+        var projB = Vec2();
+        bodyA.project(projA, axis);
+        bodyB.project(projB, axis);
+        vec2.addScalar(projB, projB, vec2.dot(axis, relPos));
+        var d0 = projA[0] - projB[1];
+        var d1 = projB[0] - projA[1];
+        if (d0 > 0 || d1 > 0) {
+            return 0;
+        } else {
+            return d0 > d1 ? d0 : d1;
+        }
+    };
+
+    /**
+     *
+     * @param output
+     * @param bodyA
+     * @param bodyB
+     * @returns {boolean}
+     */
+    CollisionSystem.prototype.getCollision = function(output, bodyA, bodyB) {
+        this.count = 0;
+
+        var axisA = bodyA.getAxis(bodyB);
+        var axisB = bodyB.getAxis(bodyA);
+
+        // Push A-axis to array
+        for (var i = 0; i < axisA.length; i++) {
+            if (this.count < this.maxAxis) {
+                vec2.copy(this.axis[this.count++], axisA[i]);
+            } else {
+                throw new Error("BodyA axis has reached max of " + this.maxAxis + " axis!");
+            }
+        }
+
+        // Push B-axis to array
+        for (var i = 0; i < axisB.length; i++) {
+            if (this.count < this.maxAxis) {
+                vec2.copy(this.axis[this.count++], axisB[i]);
+            } else {
+                throw new Error("BodyB axis has reached max of " + this.maxAxis + " axis!");
+            }
+        }
+
+        var relPos = Vec2();
+        vec2.sub(relPos, bodyB.pos, bodyA.pos);
+
+        var relVel = Vec2();
+        vec2.sub(relVel, bodyB.vel, bodyA.vel);
+
+        // Loop through all axis
+        var smallestOverlap = 0;
+        var smallestAxis = Vec2();
+        for (var i = 0; i < this.count; i++) {
+            // Get separation
+            var separation = this.getSeparation(bodyA, bodyB, this.axis[i], relPos, relVel);
+            if (separation === 0) {
+                // There is no collision
+                return false;
+            }
+
+            // Get smallest overlap
+            if (smallestOverlap == 0 || separation > smallestOverlap) {
+                smallestOverlap = separation;
+                smallestAxis = this.axis[i];
+            }
+        }
+
+        // Collision - calculate result
+        output.penetrationDepth = -smallestOverlap;
+        vec2.copy(output.normal, smallestAxis);
+        if (vec2.dot(smallestAxis, relPos) < 0) {
+            vec2.multScalar(output.normal, output.normal, -1);
+        }
+        vec2.multScalar(output.mtv, output.normal, output.penetrationDepth);
+        return true;
+    };
+
+    function CollisionsGame(canvas) {
+        this.canvas = canvas;
+        this.renderer = new Canvas2DRenderer(canvas);
+        this.viewport = [0, 0, canvas.width, canvas.height];
+
+        var that = this;
+
+        // Disable selection
+        this.canvas.onselectstart = function () {
+            return false;
+        };
+
+        // Add key listeners
+        this.keystate = [];
+        this.canvas.addEventListener("keydown", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = true;
+        }, false);
+        this.canvas.addEventListener("keyup", function (e) {
+            that.keystate[e.keyCode ? e.keyCode : e.which] = false;
+        }, false);
+
+        // A wrapper to convert client to view coords
+        var updatePos = function (pos, x, y) {
+            pos[0] = (x - that.canvas.getBoundingClientRect().left) * (that.canvas.width / that.canvas.offsetWidth);
+            pos[1] = (y - that.canvas.getBoundingClientRect().top) * (that.canvas.height / that.canvas.offsetHeight);
+        };
+        this.mouse = Vec2();
+        this.mousestate = [];
+        this.canvas.addEventListener("mousedown", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+            that.mousestate[e.button] = true;
+        }, false);
+        this.canvas.addEventListener("mousemove", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+        }, false);
+        this.canvas.addEventListener("mouseup", function (e) {
+            updatePos(that.mouse, e.clientX, e.clientY);
+            that.mousestate[e.button] = false;
+        }, false);
+        this.canvas.addEventListener("mouseout", function (e) {
+            that.mouse.x = -1;
+            that.mouse.y = -1;
+        }, false);
+
+        this.bodyA = new Box(Vec2(65, -100), Vec2(50, 75), "blue");
+
+        this.bodyB = new Box(Vec2(-85, 70), Vec2(40, 60), "red");
+        this.bodyB = new Circle(Vec2(-85, 40), 50, "red");
+
+        this.bodyDragging = false;
+        this.bodyDragStart = Vec2();
+        this.selectedBody = this.bodyB;
+
+        this.collision = new CollisionSystem();
+    }
+
+    CollisionsGame.prototype.initGame = function () {
+    };
+
+    CollisionsGame.prototype.update = function (dt) {
+        var v = this.viewport;
+        var mousePos = Vec2(this.mouse[0] - v[2] * 0.5, this.mouse[1] - v[3] * 0.5);
+        if (this.isMouseDown(0)) {
+            if (!this.bodyDragging) {
+                this.selectedBody = null;
+
+                if (this.bodyA.pointInside(mousePos)) {
+                    this.selectedBody = this.bodyA;
+                } else if (this.bodyB.pointInside(mousePos)) {
+                    this.selectedBody = this.bodyB;
+                }
+
+                if (this.selectedBody != null) {
+                    vec2.zero(this.selectedBody.vel);
+                    this.bodyDragStart[0] = mousePos[0];
+                    this.bodyDragStart[1] = mousePos[1];
+                    this.bodyDragging = true;
+                }
+            } else if (this.selectedBody != null) {
+                this.selectedBody.pos[0] += mousePos[0] - this.bodyDragStart[0];
+                this.selectedBody.pos[1] += mousePos[1] - this.bodyDragStart[1];
+                this.bodyDragStart[0] = mousePos[0];
+                this.bodyDragStart[1] = mousePos[1];
+            }
+        } else {
+            this.bodyDragging = false;
+        }
+    };
+
+    CollisionsGame.prototype.draw = function (r, v) {
+        var mousePos = Vec2(this.mouse[0] - v[2] * 0.5, this.mouse[1] - v[3] * 0.5);
+
+        r.clear();
+        r.fillRect(v[0], v[1], v[2], v[3], "black");
+
+        r.push();
+        r.translate(v[2] * 0.5, v[3] * 0.5);
+
+        var bodyA = this.selectedBody == this.bodyA ? this.bodyB : this.bodyA;
+        var bodyB = this.selectedBody != null ? this.selectedBody : this.bodyB;
+
+        bodyA.draw(r, bodyA.pointInside(mousePos) ? "white" : bodyA.color);
+        bodyB.draw(r, bodyB.pointInside(mousePos) ? "white" : bodyB.color);
+        r.strokeArc(bodyA.pos[0], bodyA.pos[1], 5, bodyA.color);
+        r.strokeArc(bodyB.pos[0], bodyB.pos[1], 5, bodyB.color);
+
+        r.setOpacity(0.5);
+        bodyA.draw(r, bodyA.color, bodyA.vel[0], bodyA.vel[1]);
+        bodyB.draw(r, bodyB.color, bodyB.vel[0], bodyB.vel[1]);
+        r.resetOpacity();
+
+        var axis = [];
+        axis.push.apply(axis, bodyA.getAxis(bodyB));
+        axis.push.apply(axis, bodyB.getAxis(bodyA));
+
+        // Get relative offset between A and B (Treat A as stationary)
+        var relOffset = Vec2();
+        vec2.sub(relOffset, bodyB.pos, bodyA.pos);
+
+        // Get relative velocity between A and B (Treat A as stationary)
+        var relVel = Vec2();
+        vec2.sub(relVel, bodyB.vel, bodyA.vel);
+
+        if (vec2.lengthSquared(relVel) > 0) {
+            var velNormal = Vec2();
+            vec2.normalize(velNormal, relVel);
+            axis.push(velNormal);
+        }
+
+        var boundsA = Bounds();
+        var boundsB = Bounds();
+        var boundsC = Bounds();
+
+        bodyA.getBounds(boundsA);
+        bodyB.getBounds(boundsB);
+        bounds.combine(boundsC, boundsA, boundsB);
+
+        var smallestAxis = Vec2();
+        var smallestOverlap = null;
+        var noCollision = false;
+
+        var projectionCenter = Vec2(boundsC[0] + (boundsC[2] - boundsC[0]) * 0.5, boundsC[1] + (boundsC[3] - boundsC[1]) * 0.5);
+
+        //r.strokeArc(projectionCenter[0], projectionCenter[1], 6, "white");
+
+        var projectionRadius = Math.max(boundsC[2] - boundsC[0], boundsC[3] - boundsC[1]) * 0.5 + 40;
+        var projectionLength = projectionRadius * 2 + 100;
+
+        function drawBodyProjection(projStart, n, t, pos, proj, offset, color) {
+
+            var temp = Vec2();
+            vec2.sub(temp, projStart, pos);
+            var dist = vec2.dot(t, temp);
+            var projClosest = Vec2();
+
+            projClosest[0] = pos[0] + t[0] * dist;
+            projClosest[1] = pos[1] + t[1] * dist;
+            r.strokeArc(projClosest[0], projClosest[1], 5, color);
+
+            var l = Math.abs(Math.max(proj[0], proj[1]) - Math.min(proj[0], proj[1]));
+            var minX = projClosest[0] - n[0] * l * 0.5 + t[0] * offset;
+            var minY = projClosest[1] - n[1] * l * 0.5 + t[1] * offset;
+            var maxX = projClosest[0] + n[0] * l * 0.5 + t[0] * offset;
+            var maxY = projClosest[1] + n[1] * l * 0.5 + t[1] * offset;
+            r.line(minX, minY, maxX, maxY, color, 4);
+
+            r.text(minX, minY, "min: "  + (proj[0] | 0), "white", "center", "middle");
+            r.text(maxX, maxY, "max: "  + (proj[1] | 0), "white", "center", "middle");
+        }
+
+        var closestAToB = Vec2();
+        if (bodyA.getClosestPoint(closestAToB, bodyB.pos)) {
+            r.line(bodyB.pos[0], bodyB.pos[1], closestAToB[0], closestAToB[1], "grey");
+        }
+
+        for (var i = 0; i < axis.length; i++) {
+            var n = axis[i];
+            var t = Vec2();
+            vec2.perp(t, n);
+
+            var projStart = Vec2(
+                projectionCenter[0] + t[0] * projectionRadius,
+                projectionCenter[1] + t[1] * projectionRadius
+            );
+
+            r.line(projStart[0] - n[0] * projectionLength * 0.5,
+                   projStart[1] - n[1] * projectionLength * 0.5,
+                   projStart[0] + n[0] * projectionLength * 0.5,
+                   projStart[1] + n[1] * projectionLength * 0.5, "yellow");
+
+            r.text(projStart[0], projStart[1], (n[0].toFixed(2)) + " , " + (n[1].toFixed(2)), "white", "center", "middle");
+
+            var projA = Vec2();
+            var projB = Vec2();
+            bodyA.project(projA, n);
+            bodyB.project(projB, n);
+
+            vec2.addScalar(projB, projB, vec2.dot(n, relOffset));
+
+            drawBodyProjection(projStart, n, t, bodyA.pos, projA, 30, bodyA.color);
+            drawBodyProjection(projStart, n, t, bodyB.pos, projB, 30, bodyB.color);
+
+            var d0 = projA[0] - projB[1];
+            var d1 = projB[0] - projA[1];
+            var overlap = d0 > d1 ? d0 : d1;
+
+            var projVel = vec2.dot(relVel, n);
+            var skip = d0 > 0 || d1 > 0;
+
+            var s = (n[0].toFixed(2)) + " , " + (n[1].toFixed(2)) + ": " + (overlap | 0) + (skip ? " (Skip)" : "");
+            r.text(10, 10 + i * 16, s, "white");
+
+            if (!skip && (smallestOverlap == null || overlap > smallestOverlap)) {
+                smallestOverlap = overlap;
+                vec2.copy(smallestAxis, n);
+            }
+
+            if (skip) {
+                noCollision = true;
+            }
+        }
+
+        var collisionNormal = Vec2();
+        var penetrationDepth = null;
+        if (smallestOverlap != null && smallestOverlap < 0){
+          penetrationDepth = -smallestOverlap;
+        }
+
+        if (this.selectedBody != null) {
+            if (!noCollision) {
+                vec2.copy(collisionNormal, smallestAxis);
+                if (vec2.dot(smallestAxis, relOffset) < 0) {
+                    vec2.multScalar(collisionNormal, collisionNormal, -1);
+                }
+                var mtv = Vec2(collisionNormal[0] * penetrationDepth, collisionNormal[1] * penetrationDepth);
+                this.selectedBody.draw(r, "lime", mtv[0], mtv[1]);
+            }
+        }
+
+        r.pop();
+
+        if (!noCollision) {
+            r.text(10, 10, "Collision!", "white");
+            r.text(10, 30, "Collision normal: " + collisionNormal[0].toFixed(2) + " , " + collisionNormal[1].toFixed(2),  "white");
+            r.text(10, 50, "Penetration depth: " + penetrationDepth,  "white");
+        }
+        r.text(10, 70, "Time enter: " + timeEnter,  "white");
+        r.text(10, 90, "Time leave: " + timeLeave,  "white");
+        r.text(10, 110, "Time diff: " + (timeLeave - timeEnter),  "white");
+
+
+    };
+
+    CollisionsGame.prototype.run = function () {
+        var r = new Canvas2DRenderer(this.canvas);
+        var v = this.viewport;
+        var that = this;
+        var last = 0;
+        var dt = (1 / 60);
+        var oneSec = 1 / 1000;
+        var accum = 0;
+        this.initGame();
+        (function gameLoop(msecs) {
+            window.requestAnimationFrame(gameLoop);
+
+            var now = msecs !== undefined ? msecs : 0;
+            var delta = (now - last) * oneSec;
+            last = now;
+            accum += delta;
+
+            while (accum >= dt) {
+                that.update(dt);
+                accum -= dt;
+            }
+
+            that.draw(r, v);
+        })(0);
+    };
+
+    CollisionsGame.prototype.isKeyDown = function (key) {
+        return typeof this.keystate[key] != "undefined" && this.keystate[key] == true;
+    };
+
+    CollisionsGame.prototype.setKeyDown = function (key, value) {
+        this.keystate[key] = value;
+    };
+
+    CollisionsGame.prototype.isMouseDown = function (button) {
+        return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+    };
+
+    CollisionsGame.prototype.setMouseButton = function (button, value) {
+        this.mousestate[button] = value;
+    };
+
+    return CollisionsGame;
+})();
+</script>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600" tabindex="1"></canvas>
+<script type="text/javascript">
+    var game = new CollisionsGame(document.getElementById("canvas"));
+    game.run();
+</script>
+</body>
+</html>

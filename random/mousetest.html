@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+    <canvas id="canvas" width="320" height="160" style="width:50%;"/>
+    <script type="text/javascript">
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var mouse = {x: 0, y: 0};
+        var fx = canvas.width / canvas.offsetWidth;
+        var fy = canvas.height / canvas.offsetHeight;
+
+        (function loop(){
+            ctx.fillstyle = "black";
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+
+            // A wrapper to convert client to view coords
+            var updateMousePos = function (e) {
+                var x = e.clientX - canvas.getBoundingClientRect().left;
+                var y = e.clientY - canvas.getBoundingClientRect().top;
+                mouse.x = x * fx;
+                mouse.y = y * fy;
+            };
+
+            canvas.addEventListener("mousemove", function (ev) {
+                updateMousePos(ev);
+            }, false);
+
+            ctx.strokeStyle = "green";
+            ctx.beginPath();
+            ctx.moveTo(mouse.x, 0);
+            ctx.lineTo(mouse.x, canvas.width);
+            ctx.moveTo(0, mouse.y);
+            ctx.lineTo(canvas.width, mouse.y);
+            ctx.closePath();
+            ctx.stroke();
+
+            requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+</html>
