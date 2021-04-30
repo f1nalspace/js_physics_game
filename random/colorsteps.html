@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src="../../js-moduleloader/szue.js"></script>
+</head>
+<body>
+<canvas id="canvas" width="800" height="400"></canvas>
+<script type="text/javascript">
+    szue.setLogLevel(szue.LogLevel.Debug);
+    szue.setSourcePath("../");
+    szue.load("szuecharts.color", function(szuecharts, color){
+
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+
+        var w = canvas.width;
+        var h = canvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        var inputColors = ["red", "green", "blue", "yellow", "white", "black"];
+
+        var bw = 125;
+        var bh = 64;
+        var bd = 0;
+        var factor = 0.25;
+
+        for (var j = 0; j < inputColors.length; j++) {
+            var basicColor = inputColors[j];
+            var colors = color.createColorSteps(basicColor, 5, factor);
+
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+
+            ctx.font = "normal 20px arial";
+
+            ctx.lineWidth = 2;
+
+            for (var i = 0; i < colors.length; i++) {
+                var y = (i * bh + i * bd);
+
+                ctx.fillStyle = colors[i];
+                ctx.strokeStyle = "black";
+                ctx.beginPath();
+                ctx.rect(2+j*bw, 2+y, bw, bh);
+                ctx.closePath();
+
+                ctx.fill();
+                //ctx.stroke();
+
+                ctx.fillStyle = "black";
+                ctx.strokeStyle = "white";
+
+                ctx.strokeText(colors[i], 2+j*bw+bw*0.5, y + bh * 0.5);
+                ctx.fillText(colors[i], 2+j*bw+bw*0.5, y + bh * 0.5);
+
+            }
+        }
+
+
+    });
+</script>
+</body>
+</html>

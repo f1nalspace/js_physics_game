@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Block collision solver</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=7"/>
+    <script type="text/javascript">
+    // shim layer with setTimeout fallback
+    var requestAnimFrame = (function () {
+        return window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.oRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function (callback) {
+                    window.setTimeout(callback, 1000 / 60);
+                };
+    })();
+
+    function addListener(element, event, fn) {
+        // Use addEventListener if available
+        if (element.addEventListener) {
+            element.addEventListener(event, fn, false);
+            // Otherwise use attachEvent, set this and event
+        } else if (element.attachEvent) {
+            element.attachEvent('on' + event, (function (el) {
+                return function () {
+                    fn.call(el, window.event);
+                };
+            }(element)));
+
+            // Break closure and primary circular reference to element
+            element = null;
+        }
+    }
+
+    function Vec2(x, y) {
+        this.x = x || 0;
+        this.y = y || 0;
+    }
+
+    Vec2.prototype.dot = function (v) {
+        return this.x * v.x + this.y * v.y;
+    };
+
+    Vec2.prototype.multScalar = function (scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
+    };
+
+    var rectIDCounter = 0;
+    function RectShape(x, y, w, h, color, dynamic, name) {
+        this.id = ++rectIDCounter;
+        this.pos = new Vec2(x, y);
+        this.size = new Vec2(w, h);
+        this.color = color;
+        this.axis = [new Vec2(1, 0), new Vec2(0, 1)];
+        this.dynamic = dynamic;
+        this.name = name;
+    }
+
+    RectShape.prototype.project = function (axis) {
+        var p = Math.abs(axis.dot(this.axis[0])) * this.size.x * 0.5 + Math.abs(axis.dot(this.axis[1])) * this.size.y * 0.5;
+        return new Vec2(-p, p);
+    };
+
+    RectShape.prototype.contains = function (x, y) {
+        return !(x < this.pos.x - this.size.x * 0.5 || x > this.pos.x + this.size.x * 0.5 || y < this.pos.y - this.size.y * 0.5 || y > this.pos.y + this.size.y * 0.5);
+    };
+
+    var runSampleApp = function () {
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width;
+        var h = canvas.height;
+        var mouse = {x: -1, y: -1};
+        var mousestate = {};
+
+        var collisionCheckbox = document.getElementById("collisionCheckbox");
+
+        var resetButton = document.getElementById("resetButton");
+
+        var updatePos = function (pos, x, y) {
+            pos.x = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+            pos.y = (y - canvas.getBoundingClientRect().top) * (canvas.height / canvas.offsetHeight);
+        };
+
+        // Disable selection
+        canvas.onselectstart = function () {
+            return false;
+        };
+
+        // Add mouse listeners
+        addListener(canvas, "mousedown", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+            mousestate[e.button] = true;
+        });
+        addListener(canvas, "mousemove", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+        });
+        addListener(canvas, "mouseup", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+            mousestate[e.button] = false;
+        });
+        addListener(canvas, "mouseout", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+        });
+
+        var isMouseDown = function (button) {
+            return typeof mousestate[button] != "undefined" && mousestate[button] == true;
+        };
+
+        var shapes = [];
+
+        var init = function() {
+            shapes = [];
+
+            shapes.push(new RectShape(300, 400, 400, 50, "black", false, "Fixed"));
+
+            shapes.push(new RectShape(300, 305, 150, 50, "red", true, "A"));
+            shapes.push(new RectShape(300, 320, 150, 50, "blue", true, "B"));
+            shapes.push(new RectShape(300, 220, 150, 50, "green", true, "C"));
+            shapes.push(new RectShape(300, 240, 200, 50, "purple", true, "D"));
+
+            shapes.push(new RectShape(300, 120, 400, 50, "black", false, "Fixed"));
+        };
+
+        var testOverlap = function (rectA, rectB) {
+            var al = rectA.pos.x - rectA.size.x * 0.5;
+            var at = rectA.pos.y - rectA.size.y * 0.5;
+            var ar = rectA.pos.x + rectA.size.x * 0.5;
+            var ab = rectA.pos.y + rectA.size.y * 0.5;
+            var bl = rectB.pos.x - rectB.size.x * 0.5;
+            var bt = rectB.pos.y - rectB.size.y * 0.5;
+            var br = rectB.pos.x + rectB.size.x * 0.5;
+            var bb = rectB.pos.y + rectB.size.y * 0.5;
+            return !(ar < bl || br < al || ab < bt || bb < at);
+        };
+
+        function solveShapeCollision(shapeA, shapeB, axis) {
+            // If there is no overlap - no need to adjust something
+            if (!testOverlap(shapeA, shapeB)) {
+                return;
+            }
+
+            // Get relative distance from A to B
+            var relativeDistance = new Vec2(shapeB.pos.x - shapeA.pos.x, shapeB.pos.y - shapeA.pos.y);
+            var distance = relativeDistance.dot(axis);
+
+            // Project the shapes onto the given axis
+            var projA = shapeA.project(axis);
+            var projB = shapeB.project(axis);
+
+            // Add projected relative distance to projection of A - because the projection is in local space!
+            projA.x += distance;
+            projA.y += distance;
+
+            // Get projection distances
+            var d0 = projA.x - projB.y;
+            var d1 = projB.x - projA.y;
+
+            // Find greatest overlap (Smallest negative)
+            var overlap = d0 > d1 ? d0 : d1;
+            if (overlap < 0) {
+                // Construct axis
+                var n = new Vec2(axis.x, axis.y);
+
+                // Fix direction based on order of creation
+                var sign = shapeA.id - shapeB.id > 0 ? 1 : -1;
+                n.multScalar(sign);
+
+                // To simulate static shapes - we assume static has a inverse mass of zero and dynamic a inverse mass of one
+                var massA = shapeA.dynamic ? 1 : 0;
+                var massB = shapeB.dynamic ? 1 : 0;
+                var invMassA = massA > 0 ? 1 / massA : 0;
+                var invMassB = massB > 0 ? 1 / massB : 0;
+
+                // Calculate correction scalar
+                var normMass = 1 / (invMassA + invMassB);
+                var correction = overlap * normMass;
+                var stabilization = 0.8; // For iterative solving, this need to be smaller that one, but greater than zero
+
+                // Solve penetration
+                shapeB.pos.x -= n.x * correction * stabilization * invMassB;
+                shapeB.pos.y -= n.y * correction * stabilization * invMassB;
+                shapeA.pos.x += n.x * correction * stabilization * invMassA;
+                shapeA.pos.y += n.y * correction * stabilization * invMassA;
+            }
+        }
+
+        function solveShapeCollisions(axis, iterations) {
+            // Loop through all unique shape pairs
+            for (var it = 0; it < iterations; it++) {
+                for (var i = 0; i < shapes.length; i++) {
+                    var shapeA = shapes[i];
+                    for (var j = i + 1; j < shapes.length; j++) {
+                        var shapeB = shapes[j];
+                        // At least one shape must be dynamic
+                        if (shapeA.dynamic || shapeB.dynamic) {
+                            solveShapeCollision(shapeA, shapeB, axis);
+                        }
+                    }
+                }
+            }
+        }
+
+        init();
+
+        var dragStart = new Vec2(0, 0);
+        var dragEnabled = false;
+        var dragObj = null;
+
+        var getShapeByPoint = function(x, y) {
+            var found = null;
+            for (var i = 0; i < shapes.length; i++) {
+                if (shapes[i].contains(x, y)) {
+                    found = shapes[i];
+                }
+            }
+            return found;
+        };
+
+        (function renderFrame() {
+            requestAnimFrame(renderFrame, null);
+
+            var i;
+
+            // Move shape by mouse
+            if (isMouseDown(0)) {
+                if (!dragEnabled) {
+                    dragObj = getShapeByPoint(mouse.x, mouse.y);
+                    dragEnabled = dragObj != null;
+                    dragStart.x = mouse.x;
+                    dragStart.y = mouse.y;
+                } else {
+                    var ox = mouse.x - dragStart.x;
+                    var oy = mouse.y - dragStart.y;
+                    dragObj.pos.x += ox;
+                    dragObj.pos.y += oy;
+                    dragStart.x = mouse.x;
+                    dragStart.y = mouse.y;
+                }
+            } else {
+                if (dragEnabled) {
+                    dragEnabled = false;
+                    dragObj = null;
+                }
+            }
+
+            // Solve shape collisions
+            if (collisionCheckbox.checked) {
+                solveShapeCollisions(new Vec2(0, 1), 1);
+            }
+
+            var fontSize = 24;
+            ctx.font = "bold " + fontSize + "px arial";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, w, h);
+
+            for (i = 0; i < shapes.length; i++) {
+                var shape = shapes[i];
+                ctx.strokeStyle = shape.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(shape.pos.x - shape.size.x * 0.5, shape.pos.y - shape.size.y * 0.5, shape.size.x, shape.size.y);
+                ctx.lineWidth = 1;
+
+                ctx.fillStyle = "black";
+                ctx.fillText(shape.name, shape.pos.x, shape.pos.y);
+            }
+        })();
+
+        addListener(resetButton, "click", function(){
+            init();
+        });
+    };
+    </script>
+</head>
+<body>
+<input type="checkbox" id="collisionCheckbox" value="1" />Solve collisions
+<button id="resetButton">Reset</button>
+<canvas id="canvas" height="600" width="700"></canvas>
+<script type="text/javascript">
+    runSampleApp();
+</script>
+</body>
+</html>

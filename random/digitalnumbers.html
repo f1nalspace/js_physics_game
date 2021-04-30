@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+    <title>Digital numbers</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+</head>
+<body>
+<canvas id="canvas" width="800" height="600"></canvas>
+<script type="text/javascript">
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+
+    var w = canvas.width;
+    var h = canvas.height;
+
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, w, h);
+
+    var digitalSegmentBit = {
+        top: 1,
+        bottom: 2,
+        middle: 4,
+        leftTop: 8,
+        rightTop: 16,
+        leftBottom: 32,
+        rightBottom: 64
+    };
+
+    var digitalNumberBitMap = {
+        0: digitalSegmentBit.top | digitalSegmentBit.bottom | digitalSegmentBit.leftTop | digitalSegmentBit.rightTop | digitalSegmentBit.leftBottom | digitalSegmentBit.rightBottom,
+        1: digitalSegmentBit.rightTop | digitalSegmentBit.rightBottom,
+        2: digitalSegmentBit.top | digitalSegmentBit.rightTop | digitalSegmentBit.middle | digitalSegmentBit.leftBottom | digitalSegmentBit.bottom,
+        3: digitalSegmentBit.rightTop | digitalSegmentBit.rightBottom | digitalSegmentBit.middle | digitalSegmentBit.top | digitalSegmentBit.bottom,
+        4: digitalSegmentBit.rightTop | digitalSegmentBit.rightBottom | digitalSegmentBit.leftTop | digitalSegmentBit.middle,
+        5: digitalSegmentBit.top | digitalSegmentBit.rightBottom | digitalSegmentBit.leftTop | digitalSegmentBit.middle | digitalSegmentBit.bottom,
+        6: digitalSegmentBit.top | digitalSegmentBit.leftTop | digitalSegmentBit.leftBottom | digitalSegmentBit.bottom | digitalSegmentBit.rightBottom | digitalSegmentBit.middle,
+        7: digitalSegmentBit.top | digitalSegmentBit.rightTop | digitalSegmentBit.rightBottom,
+        8: digitalSegmentBit.top | digitalSegmentBit.bottom | digitalSegmentBit.leftTop | digitalSegmentBit.rightTop | digitalSegmentBit.leftBottom | digitalSegmentBit.rightBottom | digitalSegmentBit.middle,
+        9: digitalSegmentBit.top | digitalSegmentBit.bottom | digitalSegmentBit.leftTop | digitalSegmentBit.rightTop | digitalSegmentBit.rightBottom | digitalSegmentBit.middle
+    };
+
+    function drawDigitalSegments(ctx, cx, cy, bits, lw, lh, color, width) {
+        ctx.strokeStyle = color || "black";
+
+        // Stretch factor
+        var sx = 0.75;
+        var sy = 0.75;
+
+        // Line half width
+        var lineHalfWidth = width * 0.5;
+
+        ctx.lineWidth = lineHalfWidth * 2;
+
+        // Top
+        if ((bits & digitalSegmentBit.top) === digitalSegmentBit.top) {
+            ctx.beginPath();
+            ctx.moveTo(cx - lw * sx * 0.5, cy - lh * 0.5 + lineHalfWidth);
+            ctx.lineTo(cx + lw * sx * 0.5, cy - lh * 0.5 + lineHalfWidth);
+            ctx.stroke();
+        }
+
+        // Bottom
+        if ((bits & digitalSegmentBit.bottom) === digitalSegmentBit.bottom) {
+            ctx.beginPath();
+            ctx.moveTo(cx - lw * sx * 0.5, cy + lh * 0.5 - lineHalfWidth);
+            ctx.lineTo(cx + lw * sx * 0.5, cy + lh * 0.5 - lineHalfWidth);
+            ctx.stroke();
+        }
+
+        // Middle
+        if ((bits & digitalSegmentBit.middle) === digitalSegmentBit.middle) {
+            ctx.beginPath();
+            ctx.moveTo(cx - lw * sx * 0.5, cy);
+            ctx.lineTo(cx + lw * sx * 0.5, cy);
+            ctx.stroke();
+        }
+
+        // Top left
+        if ((bits & digitalSegmentBit.leftTop) === digitalSegmentBit.leftTop) {
+            ctx.beginPath();
+            ctx.moveTo(cx - lw * 0.5 + lineHalfWidth, cy - lh * 0.25 - lh * sy * 0.25 + lineHalfWidth * 0.5);
+            ctx.lineTo(cx - lw * 0.5 + lineHalfWidth, cy - lh * 0.25 + lh * sy * 0.25 + lineHalfWidth * 0.5);
+            ctx.stroke();
+        }
+
+        // Top right
+        if ((bits & digitalSegmentBit.rightTop) === digitalSegmentBit.rightTop) {
+            ctx.beginPath();
+            ctx.moveTo(cx + lw * 0.5 - lineHalfWidth, cy - lh * 0.25 - lh * sy * 0.25 + lineHalfWidth * 0.5);
+            ctx.lineTo(cx + lw * 0.5 - lineHalfWidth, cy - lh * 0.25 + lh * sy * 0.25 + lineHalfWidth * 0.5);
+            ctx.stroke();
+        }
+
+        // Bottom left
+        if ((bits & digitalSegmentBit.leftBottom) === digitalSegmentBit.leftBottom) {
+            ctx.beginPath();
+            ctx.moveTo(cx - lw * 0.5 + lineHalfWidth, cy + lh * 0.25 - lh * sy * 0.25 - lineHalfWidth * 0.5);
+            ctx.lineTo(cx - lw * 0.5 + lineHalfWidth, cy + lh * 0.25 + lh * sy * 0.25 - lineHalfWidth * 0.5);
+            ctx.stroke();
+        }
+
+        // Bottom right
+        if ((bits & digitalSegmentBit.rightBottom) === digitalSegmentBit.rightBottom) {
+            ctx.beginPath();
+            ctx.moveTo(cx + lw * 0.5 - lineHalfWidth, cy + lh * 0.25 - lh * sy * 0.25 - lineHalfWidth * 0.5);
+            ctx.lineTo(cx + lw * 0.5 - lineHalfWidth, cy + lh * 0.25 + lh * sy * 0.25 - lineHalfWidth * 0.5);
+            ctx.stroke();
+        }
+
+        ctx.lineWidth = 1;
+
+        /*
+         ctx.strokeStyle = "red";
+         ctx.strokeRect(cx - lw * 0.5, cy - lh * 0.5, lw, lh);
+         */
+    }
+
+    function drawDigitalNumber(ctx, cx, cy, number, lw, lh, color, width) {
+        if (typeof digitalNumberBitMap[number] != "undefined") {
+            drawDigitalSegments(ctx, cx, cy, digitalNumberBitMap[number], lw, lh, color, width);
+        }
+    }
+
+    var fontSizes = [20,24,28,32,36,42,48,54,62,72];
+
+    var y = 0;
+    var padding = 4;
+    for (var j = 0; j < fontSizes.length; j++) {
+        var lh = fontSizes[j];
+        var lw = lh * 0.5;
+        for (var i = 0; i < 10; i++) {
+            drawDigitalNumber(ctx, lw * 0.5 + i * lw + i * padding, y + lh * 0.5, i, lw, lh, "black", lh * 0.1);
+        }
+        y += lh + padding;
+    }
+
+</script>
+</body>
+</html>

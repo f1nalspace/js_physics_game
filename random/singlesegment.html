@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Single segment</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=7"/>
+    <script src="../../js-moduleloader/szue.js"></script>
+</head>
+<body>
+<canvas id="canvas" height="720" width="1280"></canvas>
+<script type="text/javascript">
+    (function () {
+
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width;
+        var h = canvas.height;
+
+        function Vec2(x, y) {
+            this.x = x || 0;
+            this.y = y || 0;
+        }
+
+        Vec2.prototype.multScalar = function(s) {
+            this.x *= s;
+            this.y *= s;
+            return this;
+        };
+
+        Vec2.prototype.add = function(v) {
+            this.x += v.x;
+            this.y += v.y;
+            return this;
+        };
+
+        var getY = function (y) {
+            return h - 1 - y;
+        };
+
+        var getAngle = function (r) {
+            return Math.PI * 2 - r;
+        };
+
+        var pi180 = Math.PI / 180;
+        var TAU = Math.PI * 2;
+        var HALF_PI = Math.PI / 2;
+
+        // normalize ang so that it lies in 0 - PI*2
+        function normalizeAngle(ang) {
+            while (ang < 0) {
+                ang += TAU;
+            }
+            while (ang > TAU) {
+                ang -= TAU;
+            }
+            return ang;
+        }
+
+        var circleCenter = {x: w * 0.5, y: h * 0.5};
+        var circleRadius = Math.min(w, h) * 0.5 * 0.8;
+
+        // TODO: Support for clockwise
+        var inputStartAngle = pi180 * 90;
+        var inputEndAngle = pi180 * 90 + pi180 * 360;
+
+        var points = [], i;
+
+        var startDir = new Vec2(Math.cos(inputStartAngle), Math.sin(inputStartAngle));
+        var endDir = new Vec2(Math.cos(inputEndAngle), Math.sin(inputEndAngle));
+
+        points.push(new Vec2(circleCenter.x, circleCenter.y));
+        points.push(new Vec2(startDir.x * circleRadius + circleCenter.x, startDir.y * circleRadius + circleCenter.y));
+        points.push(new Vec2(endDir.x * circleRadius + circleCenter.x, endDir.y * circleRadius + circleCenter.y));
+
+        var segmentRealStart = normalizeAngle(inputStartAngle);
+        var segmentRealEnd = normalizeAngle(inputEndAngle);
+
+        var startQuadrant = Math.min(Math.floor(segmentRealStart  /HALF_PI), 3);
+        var endQuadrant = Math.min(Math.floor(segmentRealEnd / HALF_PI), 3);
+
+        var withinQuadrant = segmentRealStart < segmentRealEnd;
+        while (endQuadrant != startQuadrant || !withinQuadrant) {
+            startQuadrant = (startQuadrant + 1) % 4;
+            switch (startQuadrant) {
+                case 0:
+                    points.push(new Vec2(1, 0).multScalar(circleRadius).add(circleCenter));
+                    break;
+                case 1:
+                    points.push(new Vec2(0, 1).multScalar(circleRadius).add(circleCenter));
+                    break;
+                case 2:
+                    points.push(new Vec2(-1, 0).multScalar(circleRadius).add(circleCenter));
+                    break;
+                case 3:
+                    points.push(new Vec2(0, -1).multScalar(circleRadius).add(circleCenter));
+                    break;
+            }
+            withinQuadrant = true;
+        }
+
+        var fontSize = 16;
+        ctx.font = "bold " + fontSize + "px arial";
+        ctx.textBaseline = "top";
+
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.fillStyle = "cornflowerblue";
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.beginPath();
+        ctx.moveTo(circleCenter.x - circleRadius * 1.25, circleCenter.y);
+        ctx.lineTo(circleCenter.x + circleRadius * 1.25, circleCenter.y);
+        ctx.moveTo(circleCenter.x, circleCenter.y - circleRadius * 1.25);
+        ctx.lineTo(circleCenter.x, circleCenter.y + circleRadius * 1.25);
+        ctx.strokeStyle = "lightgrey";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(circleCenter.x, getY(circleCenter.y), circleRadius, getAngle(inputStartAngle), getAngle(inputEndAngle), true);
+        ctx.lineTo(circleCenter.x, getY(circleCenter.y));
+        ctx.closePath();
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(circleCenter.x, getY(circleCenter.y), circleRadius, getAngle(segmentRealStart), getAngle(segmentRealEnd), true);
+        ctx.lineTo(circleCenter.x, getY(circleCenter.y));
+        ctx.closePath();
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+
+        for (i = 0; i < points.length; i++) {
+            ctx.beginPath();
+            ctx.arc(points[i].x, getY(points[i].y), 4, 0, Math.PI * 2, false);
+            ctx.fillStyle = "yellow";
+            ctx.fill();
+        }
+
+    })();
+</script>
+</body>
+</html>

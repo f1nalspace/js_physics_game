@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+<canvas id="canvas" width="600" height="400"></canvas>
+<script type="text/javascript">
+
+    function renderToCanvas(w, h, func) {
+        var newCanvas = document.createElement("canvas");
+        newCanvas.width = w;
+        newCanvas.height = h;
+
+        var newCtx = newCanvas.getContext("2d");
+        func(newCtx, w, h);
+        return newCanvas;
+    }
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+
+    var w = canvas.width;
+    var h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "grey";
+    ctx.fillRect(0, 0, w, h);
+
+    var center = {x: w * 0.5, y: h * 0.5};
+
+    var blockSize = {x: 150, y: 150};
+
+    var radius = Math.min(blockSize.x, blockSize.y) * 0.5;
+
+    var pos1 = {x: center.x - blockSize.x * 1.75, y: center.y - blockSize.y * 0.5};
+    var pos2 = {x: center.x + blockSize.x * -0.5, y: center.y - blockSize.y * 0.5};
+    var pos3 = {x: center.x + blockSize.x * 0.75, y: center.y - blockSize.y * 0.5};
+
+    var radGradientImageCircle = renderToCanvas(radius * 2, radius * 2, function (r, w, h) {
+        var radius = Math.min(w, h) * 0.5;
+        r.beginPath();
+        r.arc(0 + radius, 0 + radius, radius, 0, Math.PI * 2, false);
+        r.closePath;
+        var gradient = r.createRadialGradient(0 + radius, 0 + radius, radius * 0.01, 0 + radius, 0 + radius, radius * 1);
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(1, "black");
+        r.fillStyle = gradient;
+        r.fill();
+    });
+
+    var radGradientImageRect = renderToCanvas(blockSize.x, blockSize.y, function (r, w, h) {
+        var radius = Math.min(w, h);
+        var f = 0.75;
+        r.beginPath();
+        r.rect(0,0,w,h);
+        r.closePath;
+        var gradient = r.createRadialGradient(0 + radius * 0.5, 0 + radius * 0.5, radius * f * 0.01, 0 + radius * 0.5, 0 + radius * 0.5, radius * f * 1);
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(1, "black");
+        r.fillStyle = gradient;
+        r.fill();
+    });
+
+    var linGradientImageRect = renderToCanvas(blockSize.x, blockSize.y, function (r, w, h) {
+        r.beginPath();
+        r.rect(0,0,w,h);
+        r.closePath;
+        var gradient = r.createLinearGradient(w, 0, w, h);
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(1, "black");
+        r.fillStyle = gradient;
+        r.fill();
+    });
+
+    ctx.drawImage(radGradientImageCircle, 0, 0, radius * 2, radius * 2, pos1.x, pos1.y, blockSize.x, blockSize.y);
+
+    ctx.drawImage(radGradientImageRect, 0, 0, blockSize.x, blockSize.y, pos2.x, pos2.y, blockSize.x, blockSize.y);
+
+    ctx.drawImage(linGradientImageRect, 0, 0, blockSize.x, blockSize.y, pos3.x, pos3.y, blockSize.x, blockSize.y);
+
+</script>
+</body>
+</html>

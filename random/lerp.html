@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+<body>
+<script type="text/javascript">
+    var Lerp = function (x, y, v) {
+        //	return x * (1 - v) + y * v;
+        var oneMinusV = 1 - v;
+        var xOneMinusV = x * oneMinusV;
+        var yV = y * v;
+        var xOneMinusVPlusYV = xOneMinusV + yV;
+        return xOneMinusVPlusYV;
+    };
+
+    var FastLerp = function (x, y, v) {
+        //	return x + (y - x) * v;
+        var yMinusX = y - x;
+        var yMinusXV = yMinusX * v;
+        var xPlusYMinusXV = x + yMinusXV;
+        return xPlusYMinusXV;
+    };
+
+    function FloatToIEEE(f) {
+        var buf = new ArrayBuffer(4);
+        (new Float32Array(buf))[0] = f;
+        return (new Uint32Array(buf))[0];
+    }
+
+    function FloatToHex(f) {
+        return FloatToIEEE(f).toString(16);
+    }
+
+    var i,
+            x = 0.9999988079,
+            y = 1.0000000000,
+            delta = 0.0078125,
+            numIterations = 128,
+            v, f1, f2,
+            vsteps = [0, 0.5];
+
+    document.write(FloatToHex(x, 8) + "<br/>"); //3f7fffec
+    document.write(FloatToHex(y, 8) + "<br/>"); //3f800000
+    document.write(FloatToHex(delta, 8) + "<br/>"); //3c000000
+    document.write("<br/>");
+
+    vsteps.forEach(function(v){
+        document.write(v + "<br/>");
+        for (i = 0; i < numIterations; i++) {
+            f1 = Lerp(x, y, v);
+            f2 = FastLerp(x, y, v);
+            document.write(FloatToHex(f1, 8) + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + FloatToHex(f2, 8) + "<br/>"); //3f7fffec
+            v += delta;
+        }
+        document.write("<br/>");
+    });
+</script>
+</body>
+</html>

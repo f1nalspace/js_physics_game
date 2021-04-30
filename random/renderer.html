@@ -1,0 +1,677 @@
+<!doctype html>
+<html>
+<head>
+    <title>Simple charts</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+    <style>
+        canvas {
+            border: 2px solid black;
+        }
+    </style>
+    <script type="text/javascript">
+        // Function prototype addons
+        if (!('extend' in Function.prototype)) {
+            Function.prototype.extend = function (b) {
+                var d = this;
+                for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+                function __() {
+                    this.constructor = d;
+                }
+
+                __.prototype = b.prototype;
+                d.prototype = new __();
+            };
+        }
+
+        function Matrix3x3() {
+            this.m = new Array(9);
+            this.t = new Array(9);
+            this.o = new Array(9);
+            this.setIdentity();
+        }
+
+        Matrix3x3.prototype.setFrom = function (mat) {
+            for (var i = 0; i < 9; i++) {
+                this.m[i] = mat.m[i];
+            }
+        };
+
+        Matrix3x3.prototype.setIdentity = function () {
+            this.m[0 * 3 + 0] = 1;
+            this.m[0 * 3 + 1] = 0;
+            this.m[0 * 3 + 2] = 0;
+
+            this.m[1 * 3 + 0] = 0;
+            this.m[1 * 3 + 1] = 1;
+            this.m[1 * 3 + 2] = 0;
+
+            this.m[2 * 3 + 0] = 0;
+            this.m[2 * 3 + 1] = 0;
+            this.m[2 * 3 + 2] = 1;
+        };
+
+        Matrix3x3.prototype.setScale = function (sx, sy) {
+            this.m[0 * 3 + 0] = sx;
+            this.m[0 * 3 + 1] = 0;
+            this.m[0 * 3 + 2] = 0;
+
+            this.m[1 * 3 + 0] = 0;
+            this.m[1 * 3 + 1] = sy;
+            this.m[1 * 3 + 2] = 0;
+
+            this.m[2 * 3 + 0] = 0;
+            this.m[2 * 3 + 1] = 0;
+            this.m[2 * 3 + 2] = 1;
+            return this;
+        };
+
+        Matrix3x3.prototype.setTranslation = function (tx, ty) {
+            this.m[0 * 3 + 0] = 1;
+            this.m[0 * 3 + 1] = 0;
+            this.m[0 * 3 + 2] = tx;
+
+            this.m[1 * 3 + 0] = 0;
+            this.m[1 * 3 + 1] = 1;
+            this.m[1 * 3 + 2] = ty;
+
+            this.m[2 * 3 + 0] = 0;
+            this.m[2 * 3 + 1] = 0;
+            this.m[2 * 3 + 2] = 1;
+            return this;
+        };
+
+        Matrix3x3.prototype.translate = function (tx, ty) {
+            this.t[0 * 3 + 0] = 1;
+            this.t[0 * 3 + 1] = 0;
+            this.t[0 * 3 + 2] = tx;
+
+            this.t[1 * 3 + 0] = 0;
+            this.t[1 * 3 + 1] = 1;
+            this.t[1 * 3 + 2] = ty;
+
+            this.t[2 * 3 + 0] = 0;
+            this.t[2 * 3 + 1] = 0;
+            this.t[2 * 3 + 2] = 1;
+
+            this.innerMult();
+        };
+
+        Matrix3x3.prototype.innerMult = function () {
+            this.o[0 * 3 + 0] = 1;
+            this.o[0 * 3 + 1] = 0;
+            this.o[0 * 3 + 2] = 0;
+
+            this.o[1 * 3 + 0] = 0;
+            this.o[1 * 3 + 1] = 1;
+            this.o[1 * 3 + 2] = 0;
+
+            this.o[2 * 3 + 0] = 0;
+            this.o[2 * 3 + 1] = 0;
+            this.o[2 * 3 + 2] = 1;
+
+            var i;
+
+            for (i = 0; i < 3; i++) {
+                for (var j = 0; j < 3; j++) {
+                    var total = 0;
+                    for (var k = 0; k < 3; k++) {
+                        total += this.m[i * 3 + k] * this.t[k * 3 + j];
+                    }
+                    this.o[i * 3 + j] = total;
+                }
+            }
+
+            for (i = 0; i < 9; i++) {
+                this.m[i] = this.o[i];
+            }
+        };
+
+        Matrix3x3.prototype.scale = function (sx, sy) {
+            this.t[0 * 3 + 0] = sx;
+            this.t[0 * 3 + 1] = 0;
+            this.t[0 * 3 + 2] = 0;
+
+            this.t[1 * 3 + 0] = 0;
+            this.t[1 * 3 + 1] = sy;
+            this.t[1 * 3 + 2] = 0;
+
+            this.t[2 * 3 + 0] = 0;
+            this.t[2 * 3 + 1] = 0;
+            this.t[2 * 3 + 2] = 1;
+
+            this.innerMult();
+        };
+
+        function Matrix3x3Stack(capacity) {
+            function Node(value, parent) {
+                this.value = value;
+                this.parent = parent || null;
+                this.next = null;
+            }
+
+            var nodeFirst = null;
+            var nodeLast = null;
+            for (var i = 0; i < capacity; i++) {
+                if (i == 0) {
+                    nodeLast = new Node(new Matrix3x3());
+                    nodeFirst = nodeLast;
+                } else {
+                    var nextNode = new Node(new Matrix3x3(), nodeLast);
+                    nodeLast.next = nextNode;
+                    nodeLast = nextNode;
+                }
+            }
+
+            var curFirst = null;
+            var curCount = 0;
+
+            return {
+                push: function (value) {
+                    if (curCount < capacity) {
+                        if (curCount == 0) {
+                            curFirst = nodeFirst;
+                        } else {
+                            curFirst = curFirst.next;
+                        }
+                        curFirst.value.setFrom(value);
+                        curCount++;
+                    } else {
+                        throw new Error("Stack capacity " + capacity + " reached!");
+                    }
+                },
+                pop: function () {
+                    if (curCount > 0) {
+                        var n = curFirst;
+                        curFirst = curFirst.parent;
+                        curCount--;
+                        return n.value;
+                    }
+                    throw new Error("No items in the stack!");
+                }
+            };
+        }
+
+        var radAbs = function(rad) {
+            if (rad < 0) {
+                return Math.PI * 2 + rad;
+            }
+            return rad;
+        };
+    </script>
+</head>
+<body>
+<canvas id="canvas" height="600" width="700"></canvas>
+<script type="text/javascript">
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var w = canvas.width;
+var h = canvas.height;
+var mouse = {x: -1, y: -1};
+var mousestate = {};
+var mousechanged = false;
+var mousein = false;
+var wheeldelta = 0;
+
+ctx.lineWidth = 1;
+ctx.shadowOffsetX = 0;
+ctx.shadowOffsetY = 0;
+ctx.shadowColor = "black";
+ctx.shadowBlur = 0;
+
+var updatePos = function (pos, x, y) {
+    pos.x = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+    pos.y = (y - canvas.getBoundingClientRect().top) * (canvas.height / canvas.offsetHeight);
+};
+
+var getWheelDelta = function (e) {
+    var ev = window.event || e; // old IE support
+    return Math.max(-1, Math.min(1, (ev.wheelDelta || -ev.detail)));
+};
+
+// Disable selection
+canvas.onselectstart = function () {
+    return false;
+};
+
+// Add mouse listeners
+canvas.addEventListener("mousedown", function (e) {
+    updatePos(mouse, e.clientX, e.clientY);
+    mousestate[e.button] = true;
+    e.preventDefault();
+    return false;
+}, false);
+canvas.addEventListener("mousemove", function (e) {
+    mousein = true;
+    updatePos(mouse, e.clientX, e.clientY);
+}, false);
+canvas.addEventListener("mouseup", function (e) {
+    updatePos(mouse, e.clientX, e.clientY);
+    mousestate[e.button] = false;
+}, false);
+canvas.addEventListener("mouseout", function (e) {
+    mousein = false;
+    updatePos(mouse, e.clientX, e.clientY);
+}, false);
+canvas.addEventListener("mousewheel", function (e) {
+    wheeldelta = getWheelDelta(e);
+    e.preventDefault();
+    return false;
+}, false);
+canvas.addEventListener("DOMMouseScroll", function (e) {
+    wheeldelta = getWheelDelta(e);
+    e.preventDefault();
+    return false;
+}, false);
+
+var materialKeys = {
+    Normal: 0,
+    Shadow: 1,
+    Values: 2,
+    Hover: 3
+};
+
+var materialFlags = {
+    None: 0,
+    Fill: 1,
+    Stroke: 2,
+    Shadows: 4
+};
+
+function Material(flags, fill, stroke, strokeWidth) {
+    this.flags = flags;
+    this.fillColor = fill;
+    this.shadowBackground = "white";
+    this.fillShadows = true;
+    this.fillShadowColor = "black";
+    this.fillShadowBlur = 50;
+    this.strokeColor = stroke;
+    this.strokeWidth = strokeWidth || 1;
+    this.strokeShadows = true;
+    this.strokeShadowColor = "black";
+    this.strokeShadowBlur = 10;
+    this.image = null;
+}
+Material.prototype.setStrokeShadows = function (strokeShadows) {
+    this.strokeShadows = strokeShadows;
+    return this;
+};
+Material.prototype.hasFlag = function (flag) {
+    return (this.flags & flag) == flag;
+};
+
+var shapeType = {
+    Rect: 0,
+    Circle: 1
+};
+
+function Shape(id, type, x, y) {
+    this.id = id;
+    this.type = type;
+    this.x = x;
+    this.y = y;
+    this.materials = [];
+    this.materialIndices = {};
+    this.transform = null;
+}
+
+Shape.prototype.addMaterial = function (key, mat) {
+    var idx = this.materials.length;
+    this.materials[idx] = mat;
+    this.materialIndices[key] = idx;
+    return mat;
+};
+
+Shape.prototype.getMaterial = function (key) {
+    if (typeof this.materialIndices[key] != "undefined") {
+        return this.materials[this.materialIndices[key]];
+    }
+    return null;
+};
+
+Shape.prototype.hasMaterial = function (key) {
+    if (typeof this.materialIndices[key] != "undefined") {
+        return true;
+    }
+    return false;
+};
+
+Shape.prototype.contains = function (x, y) {
+    return false;
+};
+
+Shape.prototype.isOutside = function (l, r, t, b) {
+    return false;
+};
+
+function RectShape(id, type, x, y, w, h) {
+    Shape.call(this, id, type, x, y);
+    this.w = w;
+    this.h = h;
+}
+RectShape.extend(Shape);
+
+RectShape.prototype.contains = function (x, y) {
+    return x >= this.x - this.w * 0.5 && x <= this.x + this.w * 0.5 &&
+            y >= this.y - this.h * 0.5 && y <= this.y + this.h * 0.5;
+};
+
+RectShape.prototype.isOutside = function (l, r, t, b) {
+    return (this.x - this.w * 0.5 > r) || (this.x + this.w * 0.5 < l) || (this.y - this.h * 0.5 > b) || (this.y + this.h * 0.5 < t);
+};
+
+function CircleShape(id, type, x, y, radius, startRad, endRad) {
+    Shape.call(this, id, type, x, y);
+    this.radius = radius;
+    this.startRad = startRad || 0;
+    this.endRad = endRad || Math.PI * 2;
+    var absStart = radAbs(this.startRad);
+    var absEnd = radAbs(this.endRad);
+    this.isFull = !(Math.max(absStart, absEnd) - Math.min(absStart, absEnd) < Math.PI * 2);
+}
+CircleShape.extend(Shape);
+
+CircleShape.prototype.contains = function (x, y) {
+    var absStartAngle = radAbs(this.startRad);
+    var absEndAngle = radAbs(this.endRad);
+    var px = x - this.x;
+    var py = y - this.y;
+    var angle = radAbs(Math.PI * 0.5 - Math.atan2(px, py));
+    var lenSquared = px * px + py * py;
+    var insideCircle = lenSquared <= this.radius * this.radius;
+    var insideSegment = absStartAngle > absEndAngle ? !(angle >= absEndAngle && angle <= absStartAngle) : angle >= absStartAngle && angle <= absEndAngle;
+    return insideCircle && insideSegment;
+};
+
+CircleShape.prototype.isOutside = function (l, r, t, b) {
+    var cx = this.x;
+    var cy = this.y;
+    cx = Math.max(Math.min(cx, r), l);
+    cy = Math.max(Math.min(cy, b), t);
+    var px = cx - this.x;
+    var py = cy - this.y;
+    return px * px + py * py > this.radius * this.radius;
+};
+
+function RingShape(id, type, x, y, outerRadius, innerRadius, startRad, endRad) {
+    Shape.call(this, id, type, x, y);
+    this.outerRadius = outerRadius;
+    this.innerRadius = innerRadius;
+    this.startRad = startRad || 0;
+    this.endRad = endRad || Math.PI * 2;
+    var absStart = radAbs(this.startRad);
+    var absEnd = radAbs(this.endRad);
+    this.isFull = !(Math.max(absStart, absEnd) - Math.min(absStart, absEnd) < Math.PI * 2);
+}
+RingShape.extend(Shape);
+
+RingShape.prototype.contains = function (x, y) {
+    var absStartAngle = radAbs(this.startRad);
+    var absEndAngle = radAbs(this.endRad);
+    var px = x - this.x;
+    var py = y - this.y;
+    var angle = radAbs(Math.PI * 0.5 - Math.atan2(px, py));
+    var lenSquared = px * px + py * py;
+    var insideCircle = lenSquared <= this.outerRadius * this.outerRadius && lenSquared >= this.innerRadius * this.innerRadius;
+    var insideSegment = absStartAngle > absEndAngle ? !(angle >= absEndAngle && angle <= absStartAngle) : angle >= absStartAngle && angle <= absEndAngle;
+    return insideCircle && insideSegment;
+};
+
+RingShape.prototype.isOutside = function (l, r, t, b) {
+    var cx = this.x;
+    var cy = this.y;
+    cx = Math.max(Math.min(cx, r), l);
+    cy = Math.max(Math.min(cy, b), t);
+    var px = cx - this.x;
+    var py = cy - this.y;
+    return px * px + py * py > this.outerRadius * this.outerRadius;
+};
+
+var mouseDown = false;
+var mouseStart = {x: -1, y: -1};
+
+var shapes = [];
+var hoverShapeID = null;
+var transform = new Matrix3x3();
+var origin = {x: 0, y: 0};
+var scale = 1;
+
+function createShapes() {
+    var shp, color;
+    var countX = 10;
+    var countY = 10;
+    var radius = (Math.max(w, h) / Math.max(countX, countY)) * 0.5;
+    for (var y = 0; y < countY; y++) {
+        for (var x = 0; x < countX; x++) {
+            var id = y * countX + x;
+            var xp = x * radius * 2;
+            var yp = y * radius * 2;
+            color = "rgb(" + Math.round(Math.random() * 255) + "," + Math.round(Math.random() * 255) + "," + Math.round(Math.random() * 255) + ")";
+            //shp = new CircleShape(id, shapeType.Circle, xp - radius, yp - radius, radius);
+            //shp = new RingShape(id, shapeType.Ring, xp - radius, yp - radius, radius, radius * 0.5);
+            shp = new RectShape(id, shapeType.Rect, xp - radius, yp - radius, radius * 2, radius * 2);
+            shp.addMaterial(materialKeys.Shadows, new Material(materialFlags.Fill | materialFlags.Shadows, "white", "black", 4).setStrokeShadows(false));
+            shp.addMaterial(materialKeys.Normal, new Material(materialFlags.Fill | materialFlags.Stroke, color, "black", 4).setStrokeShadows(false));
+            shp.addMaterial(materialKeys.Hover, new Material(materialFlags.Stroke | materialFlags.Shadows, "white", "yellow", 4));
+            shp.transform = transform;
+            shapes.push(shp);
+        }
+    }
+
+    shp = new RectShape(-100, shapeType.Rect, w * 0.5 - 50, h * 0.5 - 50, 100, 100);
+    color = "rgb(" + Math.round(Math.random() * 255) + "," + Math.round(Math.random() * 255) + "," + Math.round(Math.random() * 255) + ")";
+    shp.addMaterial(materialKeys.Normal, new Material(materialFlags.Fill | materialFlags.Stroke, color, "black", 4).setStrokeShadows(false));
+    shp.addMaterial(materialKeys.Hover, new Material(materialFlags.Stroke | materialFlags.Shadows, "white", "yellow", 4));
+    shapes.push(shp);
+}
+
+function update() {
+    hoverShapeID = null;
+
+    var mx, my;
+
+    if (mousein) {
+        if (mousestate[0] === true) {
+            if (!mouseDown) {
+                mouseDown = true;
+                mouseStart.x = mouse.x;
+                mouseStart.y = mouse.y;
+            } else {
+                var dx = (mouse.x - mouseStart.x) / scale;
+                var dy = (mouse.y - mouseStart.y) / scale;
+                origin.x -= dx;
+                origin.y -= dy;
+                transform.translate(dx, dy);
+                mouseStart.x = mouse.x;
+                mouseStart.y = mouse.y;
+            }
+        } else if (mousestate[0] === false) {
+            if (mouseDown) {
+                mouseDown = false;
+            }
+        }
+
+        if (!mouseDown && Math.abs(wheeldelta) > 0) {
+            var zoom = wheeldelta > 0 ? 1.1 : 0.9;
+            mx = mouse.x;
+            my = mouse.y;
+            transform.translate(origin.x, origin.y);
+            transform.scale(zoom, zoom);
+            transform.translate(
+                    -( mx / scale + origin.x - mx / ( scale * zoom ) ),
+                    -( my / scale + origin.y - my / ( scale * zoom  ) )
+            );
+            origin.x = ( mx / scale + origin.x - mx / ( scale * zoom ) );
+            origin.y = ( my / scale + origin.y - my / ( scale * zoom  ) );
+            scale *= zoom;
+            wheeldelta = 0;
+        }
+    }
+
+    if (mousein) {
+        for (var i = 0; i < shapes.length; i++) {
+            mx = mouse.x;
+            my = mouse.y;
+            if (shapes[i].transform != null) {
+                var sx = transform.m[0 * 3 + 0];
+                var sy = transform.m[1 * 3 + 1];
+                var tx = transform.m[0 * 3 + 2];
+                var ty = transform.m[1 * 3 + 2];
+                mx = (mouse.x - tx) / sx;
+                my = (mouse.y - ty) / sy;
+            }
+            if (shapes[i].hasMaterial(materialKeys.Hover) && shapes[i].contains(mx, my)) {
+                hoverShapeID = shapes[i].id;
+            }
+        }
+    }
+}
+
+function defineGeometry(shp, tx, ty, sx, sy) {
+    var radiusScale = Math.max(sx, sy);
+    ctx.beginPath();
+    switch (shp.type) {
+        case shapeType.Rect:
+            ctx.rect((shp.x - shp.w * 0.5) * sx + tx, (shp.y - shp.h * 0.5) * sy + ty, shp.w * sx, shp.h * sy);
+            break;
+        case shapeType.Circle:
+            ctx.arc(shp.x * sx + tx, shp.y * sy + ty, shp.radius * radiusScale, shp.startRad, shp.endRad, false);
+            if (!shp.isFull) {
+                ctx.lineTo(shp.x * sx + tx, shp.y * sy + ty);
+            }
+            break;
+        case shapeType.Ring:
+            ctx.arc(shp.x * sx + tx, shp.y * sy + ty, shp.outerRadius * radiusScale, shp.endRad, shp.startRad, false);
+            ctx.arc(shp.x * sx + tx, shp.y * sy + ty, shp.innerRadius * radiusScale, shp.startRad, shp.endRad, true);
+            break;
+    }
+}
+
+function drawMaterial(mat) {
+    if (mat.hasFlag(materialFlags.Fill)) {
+        if (mat.hasFlag(materialFlags.Shadows) && mat.fillShadows) {
+            ctx.shadowColor = mat.fillShadowColor;
+            ctx.shadowBlur = mat.fillShadowBlur;
+        }
+        ctx.fillStyle = mat.fillColor;
+        ctx.fill();
+        if (mat.hasFlag(materialFlags.Shadows) && mat.fillShadows) {
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = "black";
+        }
+    }
+
+    if (mat.hasFlag(materialFlags.Stroke)) {
+        if (mat.hasFlag(materialFlags.Shadows) && mat.strokeShadows) {
+            ctx.shadowColor = mat.strokeShadowColor;
+            ctx.shadowBlur = mat.strokeShadowBlur;
+        }
+        ctx.lineWidth = mat.strokeWidth;
+        ctx.strokeStyle = mat.strokeColor;
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        if (mat.hasFlag(materialFlags.Shadows) && mat.strokeShadows) {
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = "black";
+        }
+    }
+}
+
+createShapes();
+
+(function draw() {
+    requestAnimationFrame(draw);
+
+    update();
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = "rgb(150,180,230)";
+    ctx.fillRect(0, 0, w, h);
+
+    var shp, mat, i;
+
+    var clipSize = {x: w * 0.75, y: h * 0.75};
+    var clipPos = {x: w * 0.5 - clipSize.x * 0.5, y: h * 0.5 - clipSize.y * 0.5};
+    var clipRect = {l: clipPos.x, t: clipPos.y, r: clipPos.x + clipSize.x, b: clipPos.y + clipSize.y};
+
+    var tx, ty, sx, sy;
+
+    // Render shadow shapes (Shadow pre pass)
+    for (i = 0; i < shapes.length; i++) {
+        shp = shapes[i];
+
+        // Get translation and scale
+        tx = 0;
+        ty = 0;
+        sx = 1;
+        sy = 1;
+        if (shp.transform != null) {
+            tx = shp.transform.m[0 * 3 + 2];
+            ty = shp.transform.m[1 * 3 + 2];
+            sx = shp.transform.m[0 * 3 + 0];
+            sy = shp.transform.m[1 * 3 + 1];
+        }
+
+        if (shp.isOutside((clipRect.l - tx) / sx, (clipRect.r - tx) / sx, (clipRect.t - ty) / sy, (clipRect.b - ty) / sy)) {
+            continue;
+        }
+
+        mat = shp.getMaterial(materialKeys.Shadows);
+        if (mat != null && mat.hasFlag(materialFlags.Shadows) && mat.fillShadows) {
+            defineGeometry(shp, tx, ty, sx, sy);
+            ctx.shadowBlur = mat.fillShadowBlur;
+            ctx.shadowColor = mat.fillShadowColor;
+            ctx.fillStyle = mat.shadowBackground;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = "black";
+        }
+    }
+
+    // Render shapes
+    for (i = 0; i < shapes.length; i++) {
+        shp = shapes[i];
+
+        // Get translation and scale
+        tx = 0;
+        ty = 0;
+        sx = 1;
+        sy = 1;
+        if (shp.transform != null) {
+            tx = shp.transform.m[0 * 3 + 2];
+            ty = shp.transform.m[1 * 3 + 2];
+            sx = shp.transform.m[0 * 3 + 0];
+            sy = shp.transform.m[1 * 3 + 1];
+        }
+
+        if (shp.isOutside((clipRect.l - tx) / sx, (clipRect.r - tx) / sx, (clipRect.t - ty) / sy, (clipRect.b - ty) / sy)) {
+            continue;
+        }
+
+        // Normal
+        mat = shp.getMaterial(materialKeys.Normal);
+        if (mat != null) {
+            defineGeometry(shp, tx, ty, sx, sy);
+            drawMaterial(mat);
+        }
+
+        // Hover
+        if (hoverShapeID != null && shp.id == hoverShapeID) {
+            mat = shp.getMaterial(materialKeys.Hover);
+            if (mat != null) {
+                defineGeometry(shp, tx, ty, sx, sy);
+                drawMaterial(mat);
+            }
+        }
+    }
+
+    // Draw clip rect
+    ctx.strokeStyle = "red";
+    ctx.strokeRect(clipRect.l, clipRect.t, clipRect.r - clipRect.l, clipRect.b - clipRect.t);
+
+})();
+
+</script>
+</body>
+</html>

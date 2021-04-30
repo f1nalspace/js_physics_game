@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+    <title>SZUE Charts - Rotation Test</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <script type="text/javascript">
+        function Vec2(x, y) {
+            this.x = x || 0;
+            this.y = y || 0;
+        }
+
+        Vec2.prototype.dot = function (v) {
+            return this.x * v.x + this.y * v.y;
+        };
+
+        Vec2.prototype.rotate = function(angle) {
+            var c = Math.cos(angle);
+            var s = Math.sin(angle);
+            var x = this.x * c - this.y * s;
+            var y = this.x * s + this.y * c;
+            this.x = x;
+            this.y = y;
+            return this;
+        };
+
+    </script>
+</head>
+<body>
+<canvas id="canvas" height="400" width="400"></canvas>
+<script type="text/javascript">
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var center = {x: canvas.width * 0.5, y: canvas.height * 0.5};
+    var frametime = 1 / 60;
+    var rotation = 0;
+
+    var dir = new Vec2(1, 0);
+
+    function calculateTextBox(r, text, fontSize, angle, lineHeight) {
+        var lh = lineHeight || 1;
+        var lines = text.split("\n");
+        var maxW = 0;
+        var maxH = 0;
+        var outLines = [];
+
+        var i;
+
+        for (i = 0; i < lines.length; i++) {
+            var curW = r.measureText(lines[i]).width;
+            var curH = fontSize * lh;
+            outLines.push({
+                text: lines[i],
+                w: curW,
+                h: curH
+            });
+            maxW = Math.max(maxW, curW);
+            maxH += curH;
+        }
+
+        // Create rotated vertices
+        var verts = [];
+        verts.push(new Vec2(-maxW * 0.5, -maxH * 0.5).rotate(angle));
+        verts.push(new Vec2(maxW * 0.5, -maxH * 0.5).rotate(angle));
+        verts.push(new Vec2(maxW * 0.5, maxH * 0.5).rotate(angle));
+        verts.push(new Vec2(-maxW * 0.5, maxH * 0.5).rotate(angle));
+
+        // Get bounding box of rotated vertices
+        var minBox = new Vec2(verts[0].x, verts[0].y);
+        var maxBox = new Vec2(verts[0].x, verts[0].y);
+        for (i = 0; i < 4; i++) {
+            minBox.x = Math.min(minBox.x, verts[i].x);
+            minBox.y = Math.min(minBox.y, verts[i].y);
+            maxBox.x = Math.max(maxBox.x, verts[i].x);
+            maxBox.y = Math.max(maxBox.y, verts[i].y);
+        }
+
+        var size = new Vec2(maxBox.x - minBox.x, maxBox.y - minBox.y);
+        size.fontSize = fontSize;
+        size.lineHeight = lh;
+        size.mw = maxW;
+        size.mh = maxH;
+        size.radius = Math.max(maxBox.x - minBox.x, maxBox.y - minBox.y) * 0.5;
+        size.lines = outLines;
+        return size;
+    }
+
+    function drawTextBox(r, textBox, align) {
+        var lines = textBox.lines;
+        for (var i = 0; i < lines.length; i++) {
+            var x = (textBox.mw - lines[i].w) * 0.5 * align;
+            var y = i * lines[i].h + textBox.fontSize * textBox.lineHeight * 0.5 - textBox.mh * 0.5;
+
+            ctx.fillStyle = "white";
+            r.fillText(lines[i].text, x, y);
+
+            r.strokeStyle = "white";
+            r.strokeRect(x - lines[i].w * 0.5, y - lines[i].h * 0.5, lines[i].w, lines[i].h);
+        }
+    }
+
+    (function gameLoop(dt) {
+        var testText = "Yanuary very cold\nFebruary cold\nMarch fresh\nApril\nJune\nJuly";
+        var fontSize = 40;
+        var lineHeight = 1.0;
+        var textAlign = -1;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "grey";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        //rotation = Math.PI / 180 * 90;
+        rotation += 0.5 * frametime;
+
+        var textBox = calculateTextBox(ctx, testText, fontSize, rotation, lineHeight);
+
+        ctx.font = "normal " + fontSize + "px arial";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rotation);
+        drawTextBox(ctx, textBox, textAlign);
+        ctx.restore();
+
+        ctx.strokeStyle = "red";
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, textBox.radius, 0, Math.PI * 2, false);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.strokeStyle = "blue";
+        ctx.strokeRect(center.x - (textBox.x * 0.5), center.y - (textBox.y * 0.5), textBox.x, textBox.y);
+
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, 4, 0, Math.PI * 2, false);
+        ctx.closePath();
+        ctx.fill();
+
+        window.requestAnimationFrame(gameLoop);
+    })(frametime);
+</script>
+</body>
+</html>
+

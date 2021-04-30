@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+    <title>Region clipping with images</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+    <style>
+        canvas {
+            border: 1px solid #000000;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas1" width="500" height="500"></canvas>
+<canvas id="canvas2" width="500" height="500"></canvas>
+<script type="text/javascript">
+    var img = new Image();
+    img.onload = function () {
+        var drawCutOutImage = function(canvasId, useComposite) {
+            var canvas = document.getElementById(canvasId);
+            var ctx = canvas.getContext("2d");
+
+            var w = canvas.width;
+            var h = canvas.height;
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.translate(w * 0.5, h * 0.5);
+
+            var radius = Math.min(img.width, img.height) * 0.5;
+
+            if (useComposite) {
+                var offscreenCanvas = document.createElement("canvas");
+                offscreenCanvas.width = w;
+                offscreenCanvas.height = h;
+                var offscreenContext = offscreenCanvas.getContext("2d");
+                offscreenContext.translate(w * 0.5, h * 0.5);
+
+                offscreenContext.drawImage(img, 0, 0, img.width, img.height, -img.width * 0.5, -img.height * 0.5, img.width, img.height);
+
+                offscreenContext.globalCompositeOperation = "destination-in";
+
+                offscreenContext.beginPath();
+                offscreenContext.arc(0, 0, radius, 0, Math.PI * 2, false);
+                offscreenContext.fillStyle = "red";
+                offscreenContext.fill();
+
+                // Where is my black background???
+                ctx.drawImage(offscreenCanvas, -w * 0.5, -h * 0.5);
+            } else {
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2, false);
+                ctx.clip();
+
+                ctx.drawImage(img, 0, 0, img.width, img.height, -img.width * 0.5, -img.height * 0.5, img.width, img.height);
+            }
+        };
+
+        drawCutOutImage("canvas1", false);
+        drawCutOutImage("canvas2", true);
+    };
+    img.src = "../images/jp-flag.jpg";
+</script>
+</body>
+</html>

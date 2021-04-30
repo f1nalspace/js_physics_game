@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gauge</title>
+    <style>
+        canvas {
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas" height="600" width="600"></canvas>
+<script type="text/javascript">
+    var vec2 = function(x, y) {
+        return {
+            x: x,
+            y: y
+        }
+    };
+
+    var vec2Math = {
+        sub: function(a, b) {
+            return vec2(a.x - b.x, a.y - b.y);
+        },
+        distanceSquared: function(v) {
+            return v.x * v.x + v.y * v.y;
+        },
+        distance: function(v) {
+            return Math.sqrt(v.x * v.x + v.y * v.y);
+        },
+        dot: function(a, b) {
+            return a.x * b.x + a.y * b.y;
+        },
+        normalize: function(v) {
+            var l = this.distance(v);
+            if (l == 0) {
+                l = 1;
+            }
+            return vec2(v.x / l, v.y / l);
+        },
+        perp: function(v) {
+            return vec2(-v.y, v.x);
+        }
+    };
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+
+    var center = vec2(w * 0.5, h * 0.5);
+    var radius = 250;
+
+    var needleOuterRadius = radius * 0.9;
+    var needleInnerRadius = radius * -0.3;
+
+    var angle = -90 * Math.PI / 180;
+
+    var v0 = vec2(Math.cos(angle) * needleInnerRadius + center.x, Math.sin(angle) * needleInnerRadius + center.y);
+    var v1 = vec2(Math.cos(angle) * needleOuterRadius + center.x, Math.sin(angle) * needleOuterRadius + center.y);
+
+    var tipStartDistance = vec2Math.sub(v1, center);
+    var rearEndDistance = vec2Math.sub(v0, center);
+    var n = vec2Math.normalize(tipStartDistance);
+    var t = vec2Math.perp(n);
+
+    var tipLength = vec2Math.dot(tipStartDistance, n);
+    var rearEndLength = vec2Math.dot(rearEndDistance, n);
+    var tipStart = vec2(center.x + n.x * tipLength, center.y + n.y * tipLength);
+    var tipWidth = radius * 0.05;
+    var tipExtend = radius * 0.075;
+
+    var rearStart = vec2(center.x + n.x * rearEndLength, center.y + n.y * rearEndLength);
+    var rearWidth = radius * 0.1;
+    var rearExtend = radius * 0.15;
+
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(v0.x, v0.y);
+    ctx.lineTo(v1.x, v1.y);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // Tip
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(tipStart.x, tipStart.y, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(tipStart.x + n.x * tipExtend, tipStart.y + n.y * tipExtend, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(tipStart.x + t.x * tipWidth, tipStart.y + t.y * tipWidth, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(tipStart.x + -t.x * tipWidth, tipStart.y + -t.y * tipWidth, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    // Rear
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(rearStart.x, rearStart.y, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(rearStart.x + t.x * rearWidth, rearStart.y + t.y * rearWidth, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(rearStart.x + -t.x * rearWidth, rearStart.y + -t.y * rearWidth, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(rearStart.x + -n.x * rearExtend, rearStart.y + -n.y * rearExtend, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    /*
+    // Polygon (Tip triangle)
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.moveTo(rearStart.x + -n.x * rearExtend, rearStart.y + -n.y * rearExtend);
+    ctx.lineTo(rearStart.x + t.x * rearWidth, rearStart.y + t.y * rearWidth);
+    ctx.lineTo(tipStart.x + t.x * tipWidth, tipStart.y + t.y * tipWidth);
+    ctx.lineTo(tipStart.x + n.x * tipExtend, tipStart.y + n.y * tipExtend);
+    ctx.lineTo(tipStart.x + -t.x * tipWidth, tipStart.y + -t.y * tipWidth);
+    ctx.lineTo(rearStart.x + -t.x * rearWidth, rearStart.y + -t.y * rearWidth);
+    ctx.closePath();
+    ctx.fill();
+    */
+
+    // Polygon (Tip point)
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.moveTo(rearStart.x + -n.x * rearExtend, rearStart.y + -n.y * rearExtend);
+    ctx.lineTo(rearStart.x + t.x * rearWidth, rearStart.y + t.y * rearWidth);
+    ctx.lineTo(tipStart.x + n.x * tipExtend, tipStart.y + n.y * tipExtend);
+    ctx.lineTo(rearStart.x + -t.x * rearWidth, rearStart.y + -t.y * rearWidth);
+    ctx.closePath();
+    ctx.fill();
+
+    // Center
+
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, 6, 0, Math.PI * 2, false);
+    ctx.fill();
+
+</script>
+</body>
+</html>

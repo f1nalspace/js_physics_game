@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Label</title>
+    <meta charset="utf-8" />
+    <script src="../../js-moduleloader/szue.js"></script>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        @font-face {
+            font-family: Zodiac;
+            src: url(../Zodiac-Square.ttf);
+        }
+
+        body {
+            font-family: Zodiac;
+        }
+
+    </style>
+</head>
+<body>
+
+<canvas id="canvas" height="100" width="100"></canvas>
+<script type="text/javascript">
+    var go = function(){
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+
+        var fontName = "Zodiac";
+        var fontSize = 24;
+        var blockHeight = 18;
+        var text = "║";
+
+        canvas.width = blockHeight * 6;
+        canvas.height = blockHeight * 3;
+
+        ctx.font = fontSize + "px " + fontName;
+        ctx.textAlign = "center";
+
+        var w = canvas.width, h = canvas.height;
+
+        function Vec2(x, y) {
+            this.x = x || 0;
+            this.y = y || 0;
+        }
+
+        function drawPoint(x, y, r, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        var topPoint = new Vec2(w * 0.5 - fontSize, blockHeight);
+        var middlePoint = new Vec2(w * 0.5, blockHeight * 1.5);
+        var bottomPoint = new Vec2(w * 0.5 + fontSize, blockHeight * 2);
+
+        ctx.fillStyle = "#f88";
+        ctx.fillRect(0, 0, canvas.width, blockHeight);
+
+        ctx.fillStyle = "#8f8";
+        ctx.fillRect(0, blockHeight, canvas.width, blockHeight);
+
+        ctx.fillStyle = "#88f";
+        ctx.fillRect(0, 2*blockHeight, canvas.width, blockHeight);
+
+        ctx.fillStyle = "black";
+
+        ctx.textBaseline  = "top";
+        ctx.fillText(text, topPoint.x, topPoint.y);
+
+        ctx.textBaseline  = "middle";
+        ctx.fillText(text, middlePoint.x, middlePoint.y);
+
+        ctx.textBaseline  = "bottom";
+        ctx.fillText(text, bottomPoint.x, bottomPoint.y);
+
+        /*
+        drawPoint(topPoint.x, topPoint.y, 4, "red");
+        drawPoint(middlePoint.x, middlePoint.y, 4, "red");
+        drawPoint(bottomPoint.x, bottomPoint.y, 4, "red");
+        */
+    };
+    setTimeout(go, 100);
+</script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html>
+<head>
+    <title>Animation System</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+    <script type="text/javascript">
+        var RequestAnimation = (function() {
+            // shim layer with setTimeout fallback
+            var requestAnimFrame = (function(){
+                return window.requestAnimationFrame ||
+                        window.webkitRequestAnimationFrame ||
+                        window.mozRequestAnimationFrame ||
+                        function( callback ){
+                            window.setTimeout(callback, 1000 / 60);
+                        };
+            })();
+
+            // shim layer with setTimeout fallback
+            var cancelRequestAnimFrame = (function(){
+                return window.cancelRequestAnimationFrame ||
+                        window.webkitCancelRequestAnimationFrame ||
+                        window.mozCancelRequestAnimationFrame    ||
+                        function( handle ){
+                        };
+            })();
+
+            function RequestAnimation(cxt) {
+                this.ctx = ctx;
+                this.handle = null;
+                this.drawFunc = function(){};
+                this.changed = function(active){};
+            }
+
+            RequestAnimation.prototype.active = function() {
+                return this.handle != null;
+            };
+
+            RequestAnimation.prototype.update = function() {
+                if (this.handle == null) {
+                    this.changed(true);
+                    this.draw();
+                }
+            };
+
+            RequestAnimation.prototype.draw = function() {
+                if (!this.drawFunc()) {
+                    cancelRequestAnimFrame(this.handle);
+                    this.handle = null;
+                    this.changed(false);
+                } else {
+                    this.handle = requestAnimFrame(this.draw.bind(this), null);
+                }
+            };
+
+            return RequestAnimation;
+        })();
+
+        var AnimationSystem = (function() {
+            function AnimationItem(sys, parent, name) {
+                this.sys = sys;
+                this.parent = parent;
+                this.name = name;
+                this.duration = 0;
+                this.startTime = 0;
+                this.from = 0;
+                this.to = 0;
+                this.next = null;
+                this.active = false;
+            }
+
+            AnimationItem.prototype.animate = function(name, duration, to, from) {
+                this.next = new AnimationItem(this.sys, this, name);
+                this.next.duration = duration || 1000;
+                this.next.to = to || 1;
+                this.next.from = from || 0;
+                this.next.value = this.from;
+                this.next.active = false;
+                return this.next;
+            };
+
+            AnimationItem.prototype.start = function() {
+                this.startTime = Date.now();
+                this.value = this.from;
+                this.active = true;
+            };
+
+            function AnimationSystem() {
+                this.keys = {};
+                this.items = [];
+                this.count = 0;
+                this.active = false;
+                this.enabled = true;
+            }
+
+            AnimationSystem.prototype.animate = function(name, duration, to, from) {
+                var item = this.keys[name] !== undefined ? this.items[this.keys[name]] : null;
+                if (item === undefined || item == null) {
+                    item = new AnimationItem(this, null, name);
+                    this.keys[name] = this.count;
+                    this.items[this.count] = item;
+                    this.count++;
+                }
+                item.duration = duration || 1000;
+                item.to = to || 1;
+                item.from = from || item.value || 0;
+                item.start();
+                this.active = true;
+                return item;
+            };
+
+            AnimationSystem.prototype.update = function() {
+                var activeCount = 0;
+                if (this.active) {
+                    for (var i = 0; i < this.count; i++) {
+                        var item = this.items[i];
+                        if (item.active) {
+                            if (Date.now() - item.startTime >= item.duration || !this.enabled) {
+                                item.value = item.to;
+                                item.active = false;
+                                if (item.next != null) {
+                                    var n = item.next;
+                                    n.from = item.value;
+                                    this.items[i] = n;
+                                    n.start();
+                                    activeCount++;
+                                }
+                            } else {
+                                item.value = item.from + ((Date.now() - item.startTime) / item.duration) * (item.to - item.from);
+                                activeCount++;
+                            }
+                        }
+                    }
+                }
+                this.active = activeCount > 0;
+            };
+
+            AnimationSystem.prototype.is = function(name) {
+                if (this.keys[name] !== undefined) {
+                    return this.items[this.keys[name]].active;
+                }
+                return false;
+            };
+
+            AnimationSystem.prototype.get = function(name, def) {
+                if (this.keys[name] !== undefined) {
+                    return this.items[this.keys[name]].value;
+                }
+                return def || 1;
+            };
+
+            return AnimationSystem;
+        })();
+    </script>
+</head>
+<body>
+<canvas id="canvas" height="600" width="700"></canvas>
+<div id="debug" style="position: absolute; left: 750px; top: 0px;"></div>
+<script type="text/javascript">
+    var debug = document.getElementById("debug");
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+    var mouse = {x: -1, y: -1};
+    var mousestate = {};
+    var mousechanged = false;
+
+    var requestAnimation = new RequestAnimation(ctx);
+    var animationSystem = new AnimationSystem(requestAnimation);
+
+    var updatePos = function (pos, x, y) {
+        pos.x = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+        pos.y = (y - canvas.getBoundingClientRect().top) * (canvas.height / canvas.offsetHeight);
+    };
+
+    // Disable selection
+    canvas.onselectstart = function () {
+        return false;
+    };
+
+    // Add mouse listeners
+    canvas.addEventListener("mousedown", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+        mousestate[e.button] = true;
+        //mousechanged = true;
+        //requestAnimation.update();
+    }, false);
+    canvas.addEventListener("mousemove", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+        //mousechanged = true;
+        //requestAnimation.update();
+    }, false);
+    canvas.addEventListener("mouseup", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+        mousestate[e.button] = false;
+        //mousechanged = false;
+        //requestAnimation.update();
+    }, false);
+    canvas.addEventListener("mouseout", function(e){
+        updatePos(mouse, e.clientX, e.clientY);
+        //mousechanged = false;
+        //requestAnimation.update();
+    }, false);
+
+    animationSystem.animate("obj", 5000, 5).animate("obj", 10000, -5);
+
+    var renderFrame = function() {
+        animationSystem.update();
+
+        var objAnim = animationSystem.get("obj");
+
+        ctx.clearRect(0 ,0, w, h);
+
+        ctx.fillStyle = "blue";
+        ctx.fillRect(0 ,0, w, h);
+
+        ctx.fillStyle = "white";
+        //ctx.fillRect(0 , 0, w * objAnim, h * objAnim);
+
+        ctx.fillText(objAnim, 50, 50);
+
+        return mousechanged || animationSystem.active;
+    };
+
+    requestAnimation.drawFunc = renderFrame;
+    requestAnimation.changed = function(active) {
+        if (active) {
+            debug.appendChild(document.createTextNode("Animation started"));
+            debug.appendChild(document.createElement("br"));
+        } else {
+            debug.appendChild(document.createTextNode("Animation stopped"));
+            debug.appendChild(document.createElement("br"));
+        }
+    };
+    requestAnimation.update();
+
+</script>
+</body>
+</html>

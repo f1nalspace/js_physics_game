@@ -1,0 +1,250 @@
+<!doctype html>
+<html>
+<head>
+    <title>Closest Point</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+</head>
+<body>
+<canvas id="canvas" height="800" width="800"></canvas>
+<div id="debug" style="position: absolute; left: 750px; top: 0px;"></div>
+<script type="text/javascript">
+    function Vec2(x, y) {
+        this.x = x || 0;
+        this.y = y || 0;
+    }
+
+    Vec2.prototype.toString = function() {
+        return this.x + ", " + this.y;
+    };
+
+    var sign = function (v) {
+        if (v < 0) {
+            return -1;
+        } else {
+            return 1;
+        }
+    };
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+    var mouse = {x: -1, y: -1};
+    var mousestate = {};
+    var mousechanged = false;
+
+    ctx.lineWidth = 2;
+    ctx.font = "normal 20px arial";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+
+    var getY = function(v) {
+        return h - 1 - v;
+    };
+
+    var getAngle = function(r) {
+        return Math.PI * 2 - r;
+    };
+
+    var updatePos = function (pos, x, y) {
+        pos.x = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+        pos.y = getY((y - canvas.getBoundingClientRect().top) * (canvas.height / canvas.offsetHeight));
+    };
+
+    // Disable selection
+    canvas.onselectstart = function () {
+        return false;
+    };
+
+    // Add mouse listeners
+    canvas.addEventListener("mousedown", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+        mousestate[e.button] = true;
+    }, false);
+    canvas.addEventListener("mousemove", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+    }, false);
+    canvas.addEventListener("mouseup", function (e) {
+        updatePos(mouse, e.clientX, e.clientY);
+        mousestate[e.button] = false;
+    }, false);
+    canvas.addEventListener("mouseout", function(e){
+        updatePos(mouse, e.clientX, e.clientY);
+    }, false);
+
+    var box = {
+        pos: new Vec2(w / 2 - 200, h / 2),
+        radius: new Vec2(100, 150),
+        contains: function(x, y) {
+            var separated = x < this.pos.x - this.radius.x || x > this.pos.x + this.radius.x || y < this.pos.y - this.radius.y || y > this.pos.y + this.radius.y;
+            return(!separated);
+        }
+    };
+
+    var circle = {
+        pos: new Vec2(w / 2 + 200, h / 2),
+        radius: 80,
+        contains: function(x, y) {
+            var dx = x - this.pos.x;
+            var dy = y - this.pos.y;
+            var l = dx * dx + dy * dy;
+            var result = l <= this.radius * this.radius;
+            return(result);
+        }
+    };
+
+    var dragBody = null;
+    var dragging = false;
+    var dragStart = new Vec2();
+
+    var renderFrame = function() {
+        var dx, dy;
+        if (mousestate[0]) {
+            if (!dragging) {
+                dragBody = null;
+                if (box.contains(mouse.x, mouse.y)) {
+                    dragBody = box;
+                }
+                if (circle.contains(mouse.x, mouse.y)) {
+                    dragBody = circle;
+                }
+                if (dragBody != null) {
+                    dragStart.x = mouse.x;
+                    dragStart.y = mouse.y;
+                    dragging = true;
+                }
+            } else {
+                dx = mouse.x - dragStart.x;
+                dy = mouse.y - dragStart.y;
+                dragBody.pos.x += dx;
+                dragBody.pos.y += dy;
+                dragStart.x = mouse.x;
+                dragStart.y = mouse.y;
+            }
+        } else {
+            dragging = false;
+        }
+
+        var boxBottomLeft = new Vec2(box.pos.x - box.radius.x, box.pos.y - box.radius.y);
+        var boxTopRight = new Vec2(box.pos.x + box.radius.x, box.pos.y + box.radius.y);
+
+        ctx.clearRect(0 ,0, w, h);
+
+        ctx.fillStyle = "blue";
+        ctx.fillRect(0 ,0, w, h);
+
+        // Box
+        ctx.strokeStyle = "white";
+        ctx.strokeRect(boxBottomLeft.x, getY(boxBottomLeft.y) - box.radius.y * 2, box.radius.x * 2, box.radius.y * 2);
+        ctx.beginPath();
+        ctx.arc(box.pos.x, getY(box.pos.y), 3, 0, Math.PI * 2, false);
+        ctx.fillStyle = "white";
+        ctx.fill();
+
+        // Circle
+        ctx.beginPath();
+        ctx.arc(circle.pos.x, getY(circle.pos.y), circle.radius, 0, Math.PI * 2, false);
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(circle.pos.x, getY(circle.pos.y), 3, 0, Math.PI * 2, false);
+        ctx.fillStyle = "white";
+        ctx.fill();
+
+        // Rounded-Box
+        ctx.beginPath();
+        ctx.moveTo(box.pos.x - (box.radius.x), getY(box.pos.y + (box.radius.y + circle.radius)));
+        ctx.lineTo(box.pos.x + (box.radius.x), getY(box.pos.y + (box.radius.y + circle.radius)));
+        ctx.moveTo(box.pos.x - (box.radius.x), getY(box.pos.y - (box.radius.y + circle.radius)));
+        ctx.lineTo(box.pos.x + (box.radius.x), getY(box.pos.y - (box.radius.y + circle.radius)));
+        ctx.moveTo(box.pos.x - (box.radius.x + circle.radius), getY(box.pos.y - (box.radius.y)));
+        ctx.lineTo(box.pos.x - (box.radius.x + circle.radius), getY(box.pos.y + (box.radius.y)));
+        ctx.moveTo(box.pos.x + (box.radius.x + circle.radius), getY(box.pos.y - (box.radius.y)));
+        ctx.lineTo(box.pos.x + (box.radius.x + circle.radius), getY(box.pos.y + (box.radius.y)));
+        ctx.arc(box.pos.x + box.radius.x, getY(box.pos.y + box.radius.y), circle.radius, getAngle(0), getAngle(Math.PI / 2), true);
+        ctx.arc(box.pos.x - box.radius.x, getY(box.pos.y + box.radius.y), circle.radius, getAngle(Math.PI/2), getAngle(Math.PI), true);
+        ctx.arc(box.pos.x - box.radius.x, getY(box.pos.y - box.radius.y), circle.radius, getAngle(Math.PI), getAngle(Math.PI+Math.PI/2), true);
+        ctx.arc(box.pos.x + box.radius.x, getY(box.pos.y - box.radius.y), circle.radius, getAngle(Math.PI+Math.PI/2), getAngle(Math.PI*2), true);
+        ctx.strokeStyle = "yellow";
+        ctx.stroke();
+
+        // Get relative position
+        var relPos = new Vec2(circle.pos.x - box.pos.x, circle.pos.y - box.pos.y);
+
+        // Get overlap for every axis
+        var overlapX = Math.abs(relPos.x) - box.radius.x;
+        var overlapY = Math.abs(relPos.y) - box.radius.y;
+
+        // Get smallest (greatest negative) overlap
+        var overlap = overlapX > overlapY ? overlapX : overlapY;
+
+        // Two cases: Penetration or Separation
+        var normal = new Vec2();
+        var closest = new Vec2();
+        if (overlap < 0) {
+            // Penetration
+
+            // Build normal from smallest signed axis
+            if (overlapX > overlapY) {
+                normal.x = sign(relPos.x);
+                normal.y = 0;
+            } else {
+                normal.x = 0;
+                normal.y = sign(relPos.y);
+            }
+
+            // Build closest point to the box face
+            closest.x = circle.pos.x - normal.x * overlap;
+            closest.y = circle.pos.y - normal.y * overlap;
+
+            // Need to substract the radius from the current overlap which only includes the box radius
+            overlap -= circle.radius;
+        } else {
+            // Separation
+
+            // Build closest point by just clamping the circle position to box edges
+            closest.x = Math.max(Math.min(circle.pos.x, boxTopRight.x), boxBottomLeft.x);
+            closest.y = Math.max(Math.min(circle.pos.y, boxTopRight.y), boxBottomLeft.y);
+
+            // Get distance to closest point
+            dx = circle.pos.x - closest.x;
+            dy = circle.pos.y - closest.y;
+            var l = Math.sqrt(dx * dx + dy * dy);
+            if (l == 0) {
+                l = 1;
+            }
+
+            // Build normal from distance to closest point
+            normal.x = dx / l;
+            normal.y = dy / l;
+
+            // Calculate overlap
+            overlap = l - circle.radius;
+        }
+
+        ctx.beginPath();
+        ctx.arc(closest.x, getY(closest.y), 3, 0, Math.PI * 2, false);
+        ctx.fillStyle = "red";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(closest.x, getY(closest.y));
+        ctx.lineTo(closest.x + normal.x * overlap, getY(closest.y + normal.y * overlap));
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+
+        ctx.fillStyle = "white";
+        ctx.fillText(relPos.toString(), 0, 0);
+        ctx.fillText("Overlap X: " + overlapX, 0, 20);
+        ctx.fillText("Overlap Y: " + overlapY, 0, 40);
+        ctx.fillText("Smallest overlap: " + overlap, 0, 60);
+
+        requestAnimationFrame(renderFrame);
+    };
+
+    requestAnimationFrame(renderFrame);
+
+</script>
+</body>
+</html>

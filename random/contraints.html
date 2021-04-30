@@ -1,0 +1,393 @@
+<!doctype html>
+<html>
+<head>
+    <title>Contraints</title>
+    <meta name="viewport" content="initial-scale = 1, user-scalable = no">
+    <meta charset="utf-8">
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas" height="600" width="700"></canvas>
+<div id="debug" style="position: absolute; left: 750px; top: 0px;"></div>
+<script type="text/javascript">
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var w = canvas.width;
+var h = canvas.height;
+
+function Vec2(x, y) {
+    this.x = x || 0;
+    this.y = y || 0;
+}
+
+Vec2.prototype.set = function (v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+};
+
+Vec2.prototype.multScalar = function (scalar) {
+    this.x *= scalar;
+    this.y *= scalar;
+    return this;
+};
+
+Vec2.prototype.sub = function (v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+};
+
+Vec2.prototype.add = function (v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+};
+
+Vec2.prototype.dot = function (v) {
+    return this.x * v.x + this.y * v.y;
+};
+
+Vec2.prototype.magnitude = function () {
+    return Math.sqrt(this.dot(this));
+};
+
+Vec2.prototype.normalize = function () {
+    var l = this.magnitude();
+    if (l == 0) {
+        l = 1;
+    }
+    var invLen = 1.0 / l;
+    this.x *= invLen;
+    this.y *= invLen;
+    return this;
+};
+
+Vec2.prototype.rotate = function (angle) {
+    var c = Math.cos(angle);
+    var s = Math.sin(angle);
+
+    var col1 = new Vec2(c, -s);
+    var col2 = new Vec2(s, c);
+
+    var u = new Vec2(this.dot(col1), this.dot(col2));
+    this.x = u.x;
+    this.y = u.y;
+
+    return this;
+};
+
+function getClosestPointOnLineSegment(a, b, p) {
+    var distanceToLineA = new Vec2().set(p).sub(a);
+    var lineDistance = new Vec2().set(b).sub(a);
+    var lineDistanceSquared = lineDistance.dot(lineDistance);
+    var projDistance = distanceToLineA.dot(lineDistance);
+    var t = projDistance / lineDistanceSquared;
+    if (t < 0) {
+        t = 0;
+    }
+    if (t > 1) {
+        t = 1;
+    }
+    var closestPoint = new Vec2(a.x + lineDistance.x * t, a.y + lineDistance.y * t);
+    return closestPoint;
+}
+
+var particles = [];
+var constraints = [];
+var bodies = [];
+
+function addParticle(id, x, y, rotation) {
+    var particle = {
+        type: 1,
+        index: particles.length,
+        id: id,
+        prevPos: new Vec2(x, y).rotate(rotation).sub(new Vec2(0, 0)),
+        pos: new Vec2(x, y).rotate(rotation)
+    };
+    particles.push(particle);
+    bodies.push(particle);
+}
+
+function addDistanceConstraint(id, a, b) {
+    var constraint = {
+        type: 2,
+        index: constraints.length,
+        id: id,
+        a: a,
+        b: b,
+        restLength: new Vec2().set(b).sub(a).magnitude()
+    };
+    constraints.push(constraint);
+    bodies.push(constraint);
+}
+
+function createBox(id, cx, cy, hx, hy, angle) {
+    var particleIndex = particles.length;
+    var constraintIndex = constraints.length;
+
+    addParticle(id, cx - hx, cy - hy, angle);
+    addParticle(id, cx + hx, cy - hy, angle);
+    addParticle(id, cx + hx, cy + hy, angle);
+    addParticle(id, cx - hx, cy + hy, angle);
+
+    addDistanceConstraint(id, particles[particleIndex + 0].pos, particles[particleIndex + 1].pos);
+    addDistanceConstraint(id, particles[particleIndex + 1].pos, particles[particleIndex + 2].pos);
+    addDistanceConstraint(id, particles[particleIndex + 2].pos, particles[particleIndex + 3].pos);
+    addDistanceConstraint(id, particles[particleIndex + 3].pos, particles[particleIndex + 0].pos);
+    addDistanceConstraint(null, particles[particleIndex + 0].pos, particles[particleIndex + 2].pos);
+}
+
+createBox(1, 0, -100, 100, 50, 0.2);
+
+//addParticle(2, 0, 0, 0);
+
+createBox(2, 0, 200, 100, 50, 0.4);
+
+var DT = 1.0 / 60.0;
+var INV_DT = 1.0 / DT;
+var BAUMGARTE = 0.8;
+var ITERATIONS = 4;
+
+var boundaries = [
+    {
+        normal: new Vec2(0, 1),
+        point: new Vec2(0, -h * 0.5)
+    },
+    {
+        normal: new Vec2(0, -1),
+        point: new Vec2(0, h * 0.5)
+    },
+    {
+        normal: new Vec2(1, 0),
+        point: new Vec2(-w * 0.5, 0)
+    },
+    {
+        normal: new Vec2(-1, 0),
+        point: new Vec2(w * 0.5, 0)
+    }
+];
+
+{
+    var i, j, constraint, particle;
+    for (i = 0; i < bodies.length - 1; i++) {
+        var bodyA = bodies[i];
+        for (j = i + 1; j < bodies.length; j++) {
+            var bodyB = bodies[j];
+            if (bodyA.type === bodyB.type) {
+                continue;
+            }
+
+            constraint = bodyA.type === 2 ? bodyA : bodyB;
+            particle = bodyA.type === 1 ? bodyA : bodyB;
+
+            if (constraint.id === particle.id) {
+                continue;
+            }
+
+            console.log("Test constraint " + constraint.index + " against " + particle.index);
+        }
+    }
+}
+
+var renderFrame = function () {
+    var i, j, particle, p,
+            constraint,
+            dx, dy,
+            lineDistance,
+            difference,
+            corr,
+            lineNormal,
+            normal,
+            tangent,
+            closestPoint,
+            distanceToClosest,
+            projDistance,
+            v, vn, impulse,
+            distanceToPlane,
+            boundary,
+            posCorr,
+            normalImpulse,
+            tangentImpulse,
+            iterations;
+
+    var acc = new Vec2(0, -1);
+
+    for (i = 0; i < particles.length; i++) {
+        particle = particles[i];
+        p = new Vec2().set(particle.pos).multScalar(2);
+        p.sub(particle.prevPos);
+        p.add(acc);
+        particle.prevPos.set(particle.pos);
+        particle.pos.set(p);
+    }
+
+    // Solve boundary collisions
+    for (i = 0; i < particles.length; i++) {
+        particle = particles[i];
+
+        for (j = 0; j < boundaries.length; j++) {
+            boundary = boundaries[j];
+            normal = boundary.normal;
+            tangent = new Vec2(-normal.y, normal.x);
+            v = new Vec2().set(particle.pos).sub(particle.prevPos);
+
+            distanceToPlane = new Vec2().set(particle.pos).sub(boundary.point);
+            projDistance = distanceToPlane.dot(normal);
+            if (projDistance < 0) {
+                posCorr = new Vec2().set(normal).multScalar(projDistance);
+                particle.pos.sub(posCorr);
+
+                vn = v.dot(normal);
+                impulse = -(1) * vn;
+                normalImpulse = new Vec2().set(normal).multScalar(-impulse);
+                tangentImpulse = new Vec2().set(tangent).multScalar(v.dot(tangent));
+                particle.prevPos.set(particle.pos).add(normalImpulse).sub(tangentImpulse);
+            }
+
+        }
+    }
+
+    for (iterations = 0; iterations < ITERATIONS; iterations++) {
+
+        /*
+        // Solve body collisions
+        for (i = 0; i < bodies.length; i++) {
+            var bodyA = bodies[i];
+            for (j = i; j < bodies.length - 1; j++) {
+                var bodyB = bodies[j];
+                if (bodyA.type === bodyB.type) {
+                    continue;
+                }
+
+                constraint = bodyA.type === 2 ? bodyA : bodyB;
+                particle = bodyA.type === 1 ? bodyA : bodyB;
+
+                if (!constraint.id || particle.id === constraint.id) {
+                    continue;
+                }
+
+                lineDistance = new Vec2().set(constraint.a).sub(constraint.b);
+                lineNormal = new Vec2().set(lineDistance).normalize();
+                normal = new Vec2(-lineNormal.y, lineNormal.x);
+
+                var distanceToLineA = new Vec2().set(particle.pos).sub(constraint.b);
+                var lineDistanceSquared = lineDistance.dot(lineDistance);
+                projDistance = distanceToLineA.dot(lineDistance);
+                var t = projDistance / lineDistanceSquared;
+                if (t >= 0 && t <= 1) {
+                    closestPoint = new Vec2(constraint.b.x + lineDistance.x * t, constraint.b.y + lineDistance.y * t);
+                    distanceToClosest = new Vec2().set(particle.pos).sub(closestPoint);
+                    projDistance = distanceToClosest.dot(normal);
+                    if (projDistance > 0) {
+                        v = new Vec2().set(particle.pos).sub(particle.prevPos);
+                        vn = v.dot(normal);
+                        posCorr = new Vec2().set(normal).multScalar(projDistance);
+                        particle.pos.sub(posCorr);
+                        particle.prevPos.set(particle.pos);
+                        if (vn < 0) {
+                            impulse = -(1 + 1) * vn * BAUMGARTE;
+                            normalImpulse = new Vec2().set(normal).multScalar(-impulse);
+                            tangentImpulse = new Vec2().set(tangent).multScalar(v.dot(tangent));
+                            particle.prevPos.set(particle.pos).add(normalImpulse).sub(tangentImpulse);
+                        }
+                    }
+                }
+            }
+        }
+        */
+
+        // Solve constraints
+        for (i = 0; i < constraints.length; i++) {
+            constraint = constraints[i];
+            dx = constraint.b.x - constraint.a.x;
+            dy = constraint.b.y - constraint.a.y;
+            lineDistance = Math.sqrt(dx * dx + dy * dy);
+            difference = constraint.restLength - lineDistance;
+            corr = difference / lineDistance * 0.5 * BAUMGARTE;
+            constraint.a.x -= dx * corr;
+            constraint.a.y -= dy * corr;
+            constraint.b.x += dx * corr;
+            constraint.b.y += dy * corr;
+        }
+    }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.save();
+    ctx.translate(w * 0.5, h * 0.5);
+    ctx.scale(1, -1);
+
+    ctx.fillStyle = "white";
+    ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
+
+    for (i = 0; i < particles.length; i++) {
+        particle = particles[i];
+        ctx.beginPath();
+        ctx.arc(particle.pos.x, particle.pos.y, 4, 0, Math.PI * 2, false);
+        ctx.fillStyle = "black";
+        ctx.fill();
+    }
+
+    ctx.beginPath();
+    for (i = 0; i < constraints.length; i++) {
+        constraint = constraints[i];
+        ctx.moveTo(constraint.a.x, constraint.a.y);
+        ctx.lineTo(constraint.b.x, constraint.b.y);
+    }
+    ctx.strokeStyle = "black";
+    ctx.stroke();
+
+    for (i = 0; i < constraints.length; i++) {
+        constraint = constraints[i];
+        if (!constraint.id) {
+            continue;
+        }
+        lineDistance = new Vec2().set(constraint.a).sub(constraint.b);
+        lineNormal = new Vec2().set(lineDistance).normalize();
+        normal = new Vec2(-lineNormal.y, lineNormal.x);
+        ctx.beginPath();
+        ctx.arc(constraint.a.x - lineDistance.x * 0.5, constraint.a.y - lineDistance.y * 0.5, 4, 0, Math.PI * 2, false);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(constraint.a.x - lineDistance.x * 0.5, constraint.a.y - lineDistance.y * 0.5);
+        ctx.lineTo(constraint.a.x - lineDistance.x * 0.5 + normal.x * 20, constraint.a.y - lineDistance.y * 0.5 + normal.y * 20);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
+
+        /*
+         for (j = 0; j < particles.length; j++) {
+         particle = particles[j];
+         closestPoint = getClosestPointOnLineSegment(constraint.a, constraint.b, particle.pos);
+         distanceToClosest = new Vec2().set(particle.pos).sub(closestPoint);
+         projDistance = distanceToClosest.dot(normal);
+
+         ctx.beginPath();
+         ctx.arc(closestPoint.x, closestPoint.y, 4, 0, Math.PI * 2, false);
+         ctx.strokeStyle = "red";
+         ctx.stroke();
+
+         ctx.beginPath();
+         ctx.moveTo(closestPoint.x, closestPoint.y);
+         ctx.lineTo(closestPoint.x + normal.x * projDistance, closestPoint.y + normal.y * projDistance);
+         ctx.strokeStyle = "red";
+         ctx.stroke();
+         }
+         */
+    }
+
+    ctx.restore();
+
+    requestAnimationFrame(renderFrame);
+};
+
+requestAnimationFrame(renderFrame);
+</script>
+</body>
+</html>
