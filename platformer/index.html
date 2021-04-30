@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Platformer</title>
+    <script type="text/javascript" src="fm/core.js"></script>
+    <script type="text/javascript" src="fm/geometry/vec2.js"></script>
+    <script type="text/javascript" src="fm/geometry/math.js"></script>
+    <script type="text/javascript" src="fm/geometry/aabb.js"></script>
+    <script type="text/javascript" src="fm/geometry/bresenham.js"></script>
+    <script type="text/javascript" src="fm/collections/hashmap.js"></script>
+    <script type="text/javascript" src="fm/utils/utils.js"></script>
+    <script type="text/javascript" src="fm/audio/audio.js"></script>
+    <script type="text/javascript" src="fm/gfx/renderer/renderer.js"></script>
+    <script type="text/javascript" src="fm/gfx/renderer/canvas2drenderer.js"></script>
+    <script type="text/javascript" src="fm/gfx/texture.js"></script>
+    <script type="text/javascript" src="fm/gfx/lightvalue.js"></script>
+    <script type="text/javascript" src="fm/gfx/viewport.js"></script>
+    <script type="text/javascript" src="fm/gfx/renderer/rendererfactory.js"></script>
+    <script type="text/javascript" src="fm/gfx/spritesheet.js"></script>
+    <script type="text/javascript" src="fm/map/tile.js"></script>
+    <script type="text/javascript" src="fm/gfx/tileset.js"></script>
+    <script type="text/javascript" src="fm/map/tilelayer.js"></script>
+    <script type="text/javascript" src="fm/map/map.js"></script>
+    <script type="text/javascript" src="fm/map/los.js"></script>
+    <script type="text/javascript" src="fm/map/light.js"></script>
+    <script type="text/javascript" src="fm/entity/entity.js"></script>
+    <script type="text/javascript" src="fm/entity/entity.renderable.js"></script>
+    <script type="text/javascript" src="fm/entity/entity.moveable.js"></script>
+    <script type="text/javascript" src="fm/entity/entity.tileentity.js"></script>
+    <script type="text/javascript" src="fm/game/keys.js"></script>
+    <script type="text/javascript" src="fm/res/resourcemanager.js"></script>
+    <script type="text/javascript" src="fm/game/game.js"></script>
+    <script type="text/javascript" src="fm/physics/contact.js"></script>
+    <script type="text/javascript" src="fm/physics/collisions.js"></script>
+    <script type="text/javascript" src="fm/physics/contactsolver.js"></script>
+    <script type="text/javascript" src="fm/world/sidescrollingworld.js"></script>
+    <script type="text/javascript" src="platformer/player.js"></script>
+    <script type="text/javascript" src="platformer/collectable.js"></script>
+    <script type="text/javascript" src="platformer/jumppad.js"></script>
+    <script type="text/javascript" src="platformer/moveablebox.js"></script>
+    <script type="text/javascript" src="platformer/playercontroller.js"></script>
+    <script type="text/javascript" src="platformer/resources.js"></script>
+    <script type="text/javascript" src="platformer/platformer.js"></script>
+    <script type="text/javascript">
+        var game = null;
+    </script>
+    <link href="platformer.css" rel="stylesheet"/>
+</head>
+<body>
+<canvas id="gameCanvas" width="640" height="360" tabindex="1" style="float:left;"></canvas>
+<button onclick="game.toggleDebug()">Debug on/off</button>
+<script type="text/javascript">
+    game = new fm.app.platformer.Platformer(document.getElementById("gameCanvas"));
+    game.run();
+</script>
+</body>
+</html>

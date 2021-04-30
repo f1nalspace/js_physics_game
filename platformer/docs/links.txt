@@ -1,0 +1,17 @@
+Performance checks for undefined checks:
+http://jsperf.com/hasownproperty-vs-in-vs-undefined/10
+
+Better image downscale:
+http://stackoverflow.com/questions/17861447/html5-canvas-drawimage-how-to-apply-antialiasing
+
+Audio:
+http://stackoverflow.com/questions/11713114/audio-onerror-arguments
+http://www.html5rocks.com/en/tutorials/webaudio/intro/?redirect_from_locale=de
+http://updates.html5rocks.com/2012/01/Web-Audio-FAQ
+http://paulbakaus.com/tutorials/html5/web-audio-on-ios/
+
+Sprites:
+http://is.si/animator/
+
+Player jump test
+http://is.si/animator/?sW=16&sH=34&fC=5&fT=125&zoom=4&img=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAIAAAAAiCAYAAACX6tEuAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAadEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjEwMPRyoQAAAqtJREFUeF7tlltypDAMRVnerCXf8z%2B9hVRlLdnFrIlEBLku4tpYltPBgY9TvHQuWKi6md7nab65LvcAXJx7AC7OPQAX5x6Ai3MPwMU5%2FQBMEz9fQ8QVov4InHoA5AUw9JqtR6yj6DVbb7Geotds%2FagUB4At3kOrj87r3z87SlkRV4j6o7EbAGwANgHPWQfBOsHrC%2BhZjjIirhD1R4MOAFu8ctSEiK%2FXbAaeZ56ANV5XwLoWf1Q2A2AXj9Q0IuJbF%2Bvn%2F%2F8WvsMVov7IpAHQBbMmKChatCbio6uN1%2BaXXkLEFaL%2ByNBfANsE5agJER9d6%2Btxzo%2B4Qq0vMH9ksh%2BBuSbYekurrx7uY0bJj7jCkY%2FHWvdb2A2AYhftXXxPH3NYrSXiCtaX4%2Blt%2FsKRMwJVA4CNYLWMHj5mPMsV0F%2F2f%2BnLF7IDIGgTWpoo9PAVdr1ExBXQv%2FQAKOz6ERF%2F8bTxDc3f%2BPAMuq%2FHOZYadRufYQSKfwFp4Q2Lj%2Fg715nB7o0c%2FSotdeqZDFY%2FMnQANgtHKhvQxdcMzPL44KR94B6AL%2FIDYBe%2Fblm9ZeObHFZv2fiY4fHVZaz5zBXwfrXOqHzfAFjX67MMj6%2Bu%2BgBzkJ0POax%2BZM47AMR1%2BySD1Vs2DlLpj0RxAPBjqbYBqXatT%2FuVvoD3k216Bq9veZI%2FEuWPwM%2FtTw%2FAZgi9vuVJ%2FkiUB2BdtKcBUrN5aepW%2BkpyZbvC6nIkv%2BHeQtQfBToAQqQBi9uhgSmnwRV%2B2h%2BB7AAI0QZEfHEej0fCm4F%2By%2F2FHhlnp%2FgLoItvacCZfK%2Br9Mg4O9UDoP%2FprJbRw8dvCVZTIuoLPTLOTvVfgMLqckT8FgeJ%2BkKPjLMjq5MvtHZegrBMDyzTA8v0wDI9sEwPLNPBPQAs0wPL9MAyPbDMaqb5A1kli9x%2BoT0iAAAAAElFTkSuQmCC

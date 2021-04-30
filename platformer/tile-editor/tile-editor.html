@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tile Editor</title>
+    <script type="text/javascript" src="../fm/core.js"></script>
+    <script type="text/javascript" src="../fm/geometry/vec2.js"></script>
+    <script type="text/javascript" src="../fm/geometry/math.js"></script>
+    <script type="text/javascript" src="../fm/utils/utils.js"></script>
+    <script type="text/javascript" src="../fm/collections/hashmap.js"></script>
+    <script type="text/javascript" src="../fm/gfx/renderer/renderer.js"></script>
+    <script type="text/javascript" src="../fm/gfx/renderer/canvas2drenderer.js"></script>
+    <script type="text/javascript" src="../fm/gfx/texture.js"></script>
+    <script type="text/javascript" src="../fm/gfx/lightvalue.js"></script>
+    <script type="text/javascript" src="../fm/gfx/viewport.js"></script>
+    <script type="text/javascript" src="../fm/gfx/renderer/rendererfactory.js"></script>
+    <script type="text/javascript" src="../fm/res/resourcemanager.js"></script>
+    <script type="text/javascript" src="../fm/map/tile.js"></script>
+    <script type="text/javascript" src="../fm/gfx/tileset.js"></script>
+    <script type="text/javascript" src="../fm/map/tilelayer.js"></script>
+    <script type="text/javascript" src="../fm/map/map.js"></script>
+    <script type="text/javascript" src="../fm/entity/entity.js"></script>
+    <script type="text/javascript" src="../fm/entity/entity.renderable.js"></script>
+    <script type="text/javascript" src="../fm/entity/entity.moveable.js"></script>
+    <script type="text/javascript" src="../fm/game/keys.js"></script>
+    <script type="text/javascript" src="editor.js"></script>
+    <link href="style.css" rel="stylesheet"/>
+</head>
+<body>
+<div id="map" class="container">
+	<div class="title">Map<span id="map-current-size"></span><span><input type="text" size="3" id="map-x" />x<input type="text" size="3" id="map-y" /><button id="map-set-size">set</button><select id="map-load-name"></select><button id="map-load">Load</button><input type="text" id="map-name" value="new-map" /><button id="map-save">Save</button><input type="checkbox" id="grid-option" checked="checked" />Grid</span></div>
+	<canvas id="canvas" width="800" height="600"></canvas>
+</div>
+<div id="controls" class="container">
+	<div id="tileset">
+		<div class="title">Tileset<span><select id="ts"></select></span><span><button id="erase"><img src="eraser_16.png" width="16" height="16"/></button></span><span><button id="fill"><img src="fill_16.png" width="16" height="16"/></button></span><span><button id="brush" class="pressed"><img src="pencil_16.png" width="16" height="16"/></button></span></div>
+		<div id="ts-show">
+			<canvas id="ts-canvas" width="320" height="320"></canvas>
+		</div>
+	</div>
+	<div id="layers">
+		<div class="title">Layers<span><select id="tilesize"><option value="16">16px</option><option value="32" selected>32px</option><option value="64">64px</option><option value="128">128px</option></select><button id="add-layer">+</button></span></div>
+		<div id="layers-container"></div>
+	</div>
+</div>
+<script type="text/javascript">
+	var editor = new fm.app.Editor();
+	editor.run();
+</script>
+</body>
+</html>

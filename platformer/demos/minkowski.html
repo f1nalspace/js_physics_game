@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minkowski Difference</title>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="600" tabindex="1"></canvas>
+<script type="text/javascript">
+var canvas = document.getElementById("gameCanvas");
+
+var vec2 = {
+    min: function(a, b) {
+        return Vec2(Math.min(a[0], b[0]), Math.min(a[1], b[1]));
+    },
+    max: function(a, b) {
+        return Vec2(Math.max(a[0], b[0]), Math.max(a[1], b[1]));
+    },
+    sub: function(v, a, b) {
+        v[0] = a[0] - b[0];
+        v[1] = a[1] - b[1];
+    },
+    add: function(v, a, b) {
+        v[0] = a[0] + b[0];
+        v[1] = a[1] + b[1];
+    },
+    dot: function(a, b) {
+        return a[0] * b[0] + a[1] * b[1];
+    },
+    invert: function(v, a) {
+        v[0] = -a[0];
+        v[1] = -a[1];
+    }
+};
+
+
+var Keys = {
+    Left: 37,
+    Right: 39,
+    Up: 38,
+    Down: 40
+};
+
+var keystate = [];
+
+canvas.addEventListener("keydown", function (e) {
+    keystate[e.keyCode ? e.keyCode : e.which] = true;
+}, false);
+canvas.addEventListener("keyup", function (e) {
+    keystate[e.keyCode ? e.keyCode : e.which] = false;
+}, false);
+
+var mouse = [-1,-1];
+var mousestate = [];
+
+var updatePos = function (x, y) {
+    mouse[0] = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+    mouse[1] = (y - canvas.getBoundingClientRect().top) * (canvas.height / canvas.offsetHeight);
+};
+
+// Add mouse listener
+canvas.addEventListener("mousemove", function (e) {
+    updatePos(e.clientX, e.clientY);
+}, false);
+canvas.addEventListener("mousedown", function (e) {
+    updatePos(e.clientX, e.clientY);
+    mousestate[e.button] = true;
+}, false);
+canvas.addEventListener("mouseup", function (e) {
+    updatePos(e.clientX, e.clientY);
+    mousestate[e.button] = false;
+}, false);
+
+var isMouseDown = function (btn) {
+    return mousestate[btn] === true;
+};
+var isKeyDown = function (key) {
+    return keystate[key] !== undefined && keystate[key] === true;
+};
+var setKeyDown = function (key, value) {
+    keystate[key] = value;
+};
+
+function drawCircle(r, pos, rad, color) {
+    r.fillStyle = color;
+    r.beginPath();
+    r.arc(pos[0], pos[1], rad, 0, Math.PI * 2, false);
+    r.closePath();
+    r.fill();
+}
+
+function drawLine(r, from, to, color) {
+    r.strokeStyle = color;
+    r.beginPath();
+    r.moveTo(from[0], from[1]);
+    r.lineTo(to[0], to[1]);
+    r.closePath();
+    r.stroke();
+}
+
+function isMouseInBox(box, pos) {
+    return pos[0] >= box.pos[0] - box.rad[0] &&
+           pos[1] >= box.pos[1] - box.rad[1] &&
+           pos[0] <= box.pos[0] + box.rad[0] &&
+           pos[1] <= box.pos[1] + box.rad[1];
+}
+
+function getClosestPointBox(pos, ext, point) {
+    var v = [point[0], point[1]];
+    for (var i = 0; i < 2; i++) {
+        v[i] = Math.max(pos[i] - ext[i], Math.min(pos[i] + ext[i], v[i]));
+    }
+    return v;
+}
+
+function getScalarSign(scalar) {
+    if (scalar >= 0) {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+function getMajorAxis(v, pos) {
+    if (Math.abs(pos[0]) > Math.abs(pos[1])) {
+        v[0] = getScalarSign(pos[0]);
+        v[1] = 0;
+    } else {
+        v[0] = 0;
+        v[1] = getScalarSign(pos[1]);
+    }
+}
+
+function createContact(contact, boxA, boxB) {
+    var boxAExtends = [(boxA[2] - boxA[0]) * 0.5, (boxA[3] - boxA[1]) * 0.5];
+    var boxBExtends = [(boxB[2] - boxB[0]) * 0.5, (boxB[3] - boxB[1]) * 0.5];
+    var boxACenter = [boxA[0] + boxAExtends[0], boxA[1] + boxAExtends[1]];
+    var boxBCenter = [boxB[0] + boxBExtends[0], boxB[1] + boxBExtends[1]];
+    var deltaX = boxBCenter[0] - boxACenter[0];
+    var deltaY = boxBCenter[1] - boxACenter[1];
+    var delta = [deltaX, deltaY];
+    var eX = boxAExtends[0] + boxBExtends[0];
+    var eY = boxAExtends[1] + boxBExtends[1];
+
+    // form the closest plane to the point
+    var n = [0,0];
+    getMajorAxis(n, delta);
+    vec2.invert(n, n);
+    var planeCenter = [n[0] * eX + boxBCenter[0], n[1] * eY + boxBCenter[1]];
+
+    // distance point from plane
+    var planeDelta = [boxACenter[0] - planeCenter[0], boxACenter[1] - planeCenter[1]];
+    var dist = vec2.dot(planeDelta, n);
+
+    // Output
+    contact.normal = n;
+    contact.distance = dist;
+}
+
+var boxA = {
+    pos: [0,-100],
+    rad: [50,40],
+    color: "green"
+};
+
+var boxB = {
+    pos: [250,-100],
+    rad: [30,80],
+    color: "red"
+};
+
+var dragActive = false;
+var dragStart = [0, 0];
+var selected = null;
+
+function update(dt) {
+    var worldMousePos = [mouse[0] - w * 0.5, mouse[1] - h * 0.5];
+    if (isMouseDown(0)) {
+        if (!dragActive) {
+            dragActive = true;
+            selected = null;
+            if (isMouseInBox(boxA, worldMousePos)) {
+                selected = boxA;
+            } else if (isMouseInBox(boxB, worldMousePos)) {
+                selected = boxB;
+            }
+            if (selected != null) {
+                dragStart[0] = worldMousePos[0];
+                dragStart[1] = worldMousePos[1];
+            }
+        } else {
+            if (selected != null) {
+                selected.pos[0] += worldMousePos[0] - dragStart[0];
+                selected.pos[1] += worldMousePos[1] - dragStart[1];
+                dragStart[0] = worldMousePos[0];
+                dragStart[1] = worldMousePos[1];
+            }
+        }
+    } else {
+        if (dragActive) {
+            dragActive = false;
+        }
+    }
+}
+
+function render(r) {
+    r.clearRect(0, 0, w, h);
+
+    r.fillStyle = "black";
+    r.fillRect(0, 0, w, h);
+
+    r.save();
+    r.translate(w * 0.5,h * 0.5);
+
+    drawCircle(r, [0,0], 4, "white");
+
+    r.strokeStyle = boxA.color;
+    r.strokeRect(boxA.pos[0] - boxA.rad[0], boxA.pos[1] - boxA.rad[1], boxA.rad[0] * 2, boxA.rad[1] * 2);
+    drawCircle(r, boxA.pos, 4, boxA.color);
+
+    r.strokeStyle = boxB.color;
+    r.strokeRect(boxB.pos[0] - boxB.rad[0], boxB.pos[1] - boxB.rad[1], boxB.rad[0] * 2, boxB.rad[1] * 2);
+    drawCircle(r, boxB.pos, 4, boxB.color);
+
+    var boxAAABB = [boxA.pos[0] - boxA.rad[0], boxA.pos[1] - boxA.rad[1], boxA.pos[0] + boxA.rad[0], boxA.pos[1] + boxA.rad[1]];
+    var boxBAABB = [boxB.pos[0] - boxB.rad[0], boxB.pos[1] - boxB.rad[1], boxB.pos[0] + boxB.rad[0], boxB.pos[1] + boxB.rad[1]];
+
+    var boxAExtends = [(boxAAABB[2] - boxAAABB[0]) * 0.5, (boxAAABB[3] - boxAAABB[1]) * 0.5];
+    var boxBExtends = [(boxBAABB[2] - boxBAABB[0]) * 0.5, (boxBAABB[3] - boxBAABB[1]) * 0.5];
+    var boxACenter = [boxAAABB[0] + boxAExtends[0], boxAAABB[1] + boxAExtends[1]];
+    var boxBCenter = [boxBAABB[0] + boxBExtends[0], boxBAABB[1] + boxBExtends[1]];
+    var deltaX = boxBCenter[0] - boxACenter[0];
+    var deltaY = boxBCenter[1] - boxACenter[1];
+    var delta = [deltaX, deltaY];
+    var eX = boxAExtends[0] + boxBExtends[0];
+    var eY = boxAExtends[1] + boxBExtends[1];
+
+    var pos = [deltaX, deltaY];
+
+    var ext = [eX, eY];
+
+    drawCircle(r, pos, 4, "yellow");
+
+    r.strokeStyle = "yellow";
+    r.strokeRect(pos[0] - ext[0], pos[1] - ext[1], ext[0] * 2, ext[1] * 2);
+
+    var origin = [0, 0];
+    var closest = getClosestPointBox(pos, ext, origin);
+
+    var distance = [closest[0] - pos[0], closest[1] - pos[1]];
+
+    drawCircle(r, closest, 4, "blue");
+    drawLine(r, closest, origin, "grey");
+
+    var axis = [0,0];
+    getMajorAxis(axis, delta);
+    vec2.invert(axis, axis);
+    drawLine(r, [closest[0], closest[1]], [closest[0] + axis[0] * 20, closest[1] + axis[1] * 20], "white");
+
+    var contact = {
+        normal: [0,0],
+        distance: 0,
+        cA: [0,0],
+        cB: [0,0]
+    };
+    createContact(contact, boxAAABB, boxBAABB);
+
+    r.restore();
+}
+
+var dt = 1 / 60;
+
+var ctx = canvas.getContext("2d");
+var w = canvas.width;
+var h = canvas.height;
+(function gameLoop(msecs) {
+    window.requestAnimationFrame(gameLoop);
+    update(dt);
+    render(ctx);
+})(0);
+</script>
+</body>
+</html>

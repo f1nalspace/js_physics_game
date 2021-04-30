@@ -1,0 +1,55 @@
+Highest priority are on top
+---------------------------
+
+- Sprites / Texture animations
+
+- Entities (Random order):
+
+  - Keys / Crystals (Other type for open doors)
+  - Levers
+  - Doors
+  - Spikes
+  - Firepit
+  - Moveable tiles (Up and down sinus, Elevators, Left and right sinus)
+  - Containers (Add mass to each entity, Thanks to speculative contacts these will stack properly)
+  - Turrets (Unmovable)
+
+- OSD (Player state, Game score, Keys?, Items?)
+
+- Lights
+  - Torches or electric lights?
+
+- Water / Lava / Acid (Simple fixed pools)
+
+- Floodable and drainable areas for any liquid type
+  May be simple physics or some sph like thing with big particles
+
+- Local game states (Menu, Level, etc.)
+- Menu (Menu states, Main, Options)
+
+- Editor improvements:
+
+  - Fill tiles (Click on a tile all nearby connected tiles with the same type becomes the selected)
+  - Light properties (Object properties editor)
+
+Special asset making tasks
+--------------------------
+
+- Player character sprite animation sheet (standing, walking, jumping, falling)
+
+- Map tileset / Tiles:
+
+  Types:
+  - Rock
+  - Dirt/+Grass
+  - Metal
+  - Industrial style
+  - Glass
+
+- Entity sprite animation sheets:
+
+Other stuff which has no priority at all
+----------------------------------------
+
+- A name for the game :D
+- Game canvas scale (Center canvas on window based on aspect ratio, Stretch, No scale at all - can be taken from towadev)

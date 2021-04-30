@@ -1,0 +1,3 @@
+chcon -R -t httpd_sys_script_rw_t DIR
+
+tells SElinux that PHP may write to the dir
