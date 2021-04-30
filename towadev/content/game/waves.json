@@ -1,0 +1,76 @@
+{
+    "waves": [
+        {
+            "id": "wave-1",
+            "count": 20,
+            "enemy": "enemy-1",
+            "interval": 0.2,
+            "bonus" : 25
+        },
+        {
+            "id": "wave-2",
+            "count": 20,
+            "enemy": "enemy-2",
+            "interval": 0.2,
+            "bonus" : 30
+        },
+        {
+            "id": "wave-3",
+            "count": 20,
+            "enemy": "enemy-3",
+            "interval": 0.25,
+            "bonus" : 35
+        },
+        {
+            "id": "wave-4",
+            "count": 20,
+            "enemy": "enemy-4",
+            "interval": 0.25,
+            "bonus" : 40
+        },
+        {
+            "id": "wave-5",
+            "count": 20,
+            "enemy": "enemy-5",
+            "interval": 0.3,
+            "bonus" : 45
+        },
+        {
+            "id": "wave-6",
+            "count": 20,
+            "enemy": "enemy-6",
+            "interval": 0.3,
+            "bonus" : 60
+        },
+        {
+            "id": "wave-7",
+            "count": 1,
+            "enemy": "enemy-7-boss",
+            "interval": 0.35,
+            "bonus" : 100,
+            "special": "Boss-1"
+        },
+        {
+            "id": "wave-8",
+            "count": 20,
+            "enemy": "enemy-8",
+            "interval": 0.35,
+            "bonus" : 150
+        },
+        {
+            "id": "wave-9",
+            "count": 20,
+            "enemy": "enemy-9",
+            "interval": 0.4,
+            "bonus" : 200
+        },
+        {
+            "id": "wave-10",
+            "count": 50,
+            "enemy": "enemy-10-mass",
+            "interval": 0.4,
+            "bonus" : 500,
+            "special": "Mass-1"
+        }
+    ]
+}

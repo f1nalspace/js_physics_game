@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calc</title>
+
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.css" type="text/css"/>
+
+    <script type="text/javascript" src="js/jquery-1.9.1.js"></script>
+    <script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
+
+    <script type="text/javascript" src="final/core.js"></script>
+
+    <style type="text/css">
+        .blue {
+            color: blue;
+        }
+
+        .green {
+            color: green;
+        }
+
+        .red {
+            color: red;
+        }
+
+        .purple {
+            color: purple;
+        }
+
+        .even {
+
+        }
+
+        .odd {
+        }
+
+        .t-count-value {
+            padding:6px 12px;
+        }
+    </style>
+</head>
+<body>
+<table class="table table-striped table-bordered" id="table" style="display:none;">
+    <thead>
+    <th>T-Name</th>
+    <th>T-Cost</th>
+    <th>T-Cooldown</th>
+    <th>T-Dmg</th>
+    <th>T-Dmg (Overall)</th>
+    <th>T-Range</th>
+    <th>T-Count</th>
+    <th>E-Speed</th>
+    <th>E-HP</th>
+    <th>E-HP (Total)</th>
+    <th>E-In secs range</th>
+    <th>T-Shots</th>
+    <th>T-Shots (Total)</th>
+    <th>T-Dmg (Total)</th>
+    <th>E-Killed</th>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+<div class="container-fluid" id="output"></div>
+<script type="text/javascript">
+    final.setLogLevel(final.LogLevel.Debug);
+    final.addSourcePath("final/", "^(final\\..*)$", false, "final");
+    final.load(["final.resourcemanager", "final.utils"], function () {
+        var tileSize = 1;
+
+        var output = $("#output");
+        var tblTemplate = $("#table");
+        var resMng = new final.resourcemanager.ResourceManager();
+
+        var towers = new final.utils.HashMap();
+        var weapons = new final.utils.HashMap();
+        var enemies = new final.utils.HashMap();
+        var waves = new final.utils.HashMap();
+        var game = {};
+
+        resMng.add("content/game/game.json", "game", function (key, xhr) {
+            game = JSON.parse(xhr.responseText);
+        });
+
+        resMng.add("content/game/towers.json", "towers", function (key, xhr) {
+            var obj = JSON.parse(xhr.responseText);
+            final.utils.loadGameKeys(obj, "towers", towers);
+        });
+
+        resMng.add("content/game/enemies.json", "enemies", function (key, xhr) {
+            var obj = JSON.parse(xhr.responseText);
+            final.utils.loadGameKeys(obj, "enemies", enemies);
+        });
+
+        resMng.add("content/game/waves.json", "waves", function (key, xhr) {
+            var obj = JSON.parse(xhr.responseText);
+            final.utils.loadGameKeys(obj, "waves", waves);
+        });
+
+        resMng.add("content/game/weapons.json", "weapons", function (key, xhr) {
+            var obj = JSON.parse(xhr.responseText);
+            final.utils.loadGameKeys(obj, "weapons", weapons);
+        });
+
+        var getModProperty = function (root, name, def) {
+            return root !== undefined && root[name] !== undefined && root[name] != null ? root[name] : def;
+        };
+
+        var defineEnemy = function (entity, enemyId, waveId) {
+            var def = enemies.get(enemyId);
+            if (def === undefined || def == null) {
+                throw new Error("Enemy by id '" + enemyId + "' not found!")
+            }
+            var wave = waves.get(waveId);
+            var mods = wave['enemyMods'];
+            entity.speed = getModProperty(mods, "speed", def.speed) * getModProperty(mods, "speedFactor", 1);
+            entity.health = getModProperty(mods, 'health', def.health) * getModProperty(mods, "healthFactor", 1);
+            entity.bounty = getModProperty(mods, 'bounty', def.bounty) * getModProperty(mods, "bountyFactor", 1);
+            entity.armor = getModProperty(mods, 'armor', def.armor) * getModProperty(mods, "armorFactor", 1);
+            entity.penalty = getModProperty(def, 'penalty', 1);
+        };
+
+        var getWaveId = function(index) {
+            return waves.keys[index];
+        };
+
+        resMng.finished = function () {
+            var initialMoney = game.initialMoney;
+            var maxTowers = 100;
+            var waveStart = 0;
+            var waveEnd = waves.count - 1;
+
+            // Set initial bought towers array to zero
+            var boughtTowers = {};
+            var t;
+            for (var j = waveStart; j <= waveEnd; j++) {
+                boughtTowers[j] = {};
+                for (var i = 0, c = towers.count; i < c; i++) {
+                    t = towers.item(i);
+                    boughtTowers[j][t.id] = 0;
+                }
+            }
+
+            function increaseTower(wId, tId, cnt, money) {
+                var mt = towers.get(tId);
+                if ((money - mt.cost) >= 0 || cnt < 0) {
+                    boughtTowers[wId][tId] += cnt;
+                    boughtTowers[wId][tId] = Math.max(0, Math.min(boughtTowers[wId][tId], maxTowers));
+                }
+            }
+
+            (function update() {
+                output.html("");
+
+                var waveIndex, i, waveId;
+
+                var listContainer = $("<nav/>");
+                var list = $("<ul/>").addClass("pagination");
+                for (waveIndex = waveStart; waveIndex <= waveEnd; waveIndex++) {
+                    var li = $("<li/>");
+                    li.append($("<a/>").attr("href", "#wave" + waveIndex).text(waveIndex));
+                    list.append(li);
+                }
+                listContainer.append(list);
+                output.append(listContainer);
+
+                for (waveIndex = waveStart; waveIndex <= waveEnd; waveIndex++) {
+                    waveId = getWaveId(waveIndex);
+                    var wave = waves.get(waveId);
+                    var waveTitle = wave['special'] !== undefined && wave['special'] != null && wave['special'].length > 0 ? wave['special'] : "";
+                    var waveInterval = wave['interval'];
+
+                    var enemyCount = wave.count;
+                    var enemy = {};
+                    defineEnemy(enemy, wave.enemy, waveId);
+
+                    var tileEnemySpeed = enemy.speed; // Enemy speed (Meters per second)
+                    var enemyHp = enemy.health;
+                    var totalHp = enemyHp * enemyCount;
+
+                    var money = initialMoney;
+                    var spentMoney = 0;
+
+                    // Substract money for all bought towers from start wave to this wave
+                    for (i = waveStart; i <= waveIndex; i++) {
+                        if (i < waveIndex) {
+                            // Add bounty from previous wave
+                            var otherWaveId = getWaveId(i);
+                            var otherWave = waves.get(otherWaveId);
+                            var otherEnemyCount = otherWave.count;
+                            var otherEnemy = enemies.get(otherWave.enemy);
+                            var otherBounty = otherEnemy.bounty * otherEnemyCount;
+                            var otherBonus = otherWave.bonus;
+                            money += otherBounty + otherBonus;
+                        }
+
+                        // Go though all towers
+                        if (i == waveIndex) {
+                            var tmp = boughtTowers[i];
+                            for (var k in tmp) {
+                                if (tmp.hasOwnProperty(k)) {
+                                    t = towers.get(k);
+                                    money -= t.cost * tmp[k];
+                                    spentMoney += t.cost * tmp[k];
+                                }
+                            }
+                        }
+                    }
+
+                    var waveBounty = enemy.bounty * enemyCount;
+                    var waveBonus = wave.bonus;
+
+                    var div = $("<div/>").addClass("wave").addClass(i % 2 == 0 ? "even" : "odd");
+                    div.append($("<a/>").attr("name", "wave" + waveIndex));
+                    div.append($("<h3/>").text("Wave " + waveIndex + (waveTitle.length > 0 ? " (" + waveTitle + ")" : "")));
+                    var txt = "Enemy: " + wave.enemy + " (" + enemyCount + ")";
+                    txt += ", " + "Money: " + money;
+                    txt += ", " + "<strong>Spent: " + spentMoney + "</strong>";
+                    txt += ", " + "Bounty: " + waveBounty;
+                    txt += ", " + "Bonus: " + waveBonus;
+
+                    div.append($("<p/>").html(txt));
+
+                    var tbl = tblTemplate.clone();
+                    tbl.show();
+                    div.append(tbl);
+
+                    var totalTowerDamage = 0;
+                    var totalKilledEnemies = 0;
+                    for (i = 0, c = towers.count; i < c; i++) {
+                        var tower = towers.item(i);
+                        var weapon = weapons.get(tower.weapon);
+                        var bullet = weapon['bullet'];
+
+                        var towerCount = boughtTowers[waveIndex][tower.id];
+
+                        var tr = $("<tr/>");
+                        var canBuy = money - tower.cost >= 0;
+                        if (!canBuy) {
+                            tr.addClass("red");
+                        }
+
+                        //var towerCount = Math.floor(totalMoney / tower.cost);
+
+                        var bulletDmgRangeMin = bullet.damageRanges.min;
+                        var bulletDmgRangeMax = bullet.damageRanges.max;
+                        var avgDmgFactor = (bulletDmgRangeMin + bulletDmgRangeMax) / 2;
+                        var towerDmg = getModProperty(tower.weaponmods, "bulletDamage", bullet.damage) * avgDmgFactor;
+                        var cooldown = getModProperty(tower.weaponmods, "cooldownTime", weapon.cooldownTime);
+                        var towerRange = getModProperty(tower.weaponmods, "range", weapon.range);
+                        var towerTileRange = towerRange * 2 / tileSize;
+                        var towerMinTileRange = Math.floor(towerTileRange);
+                        var towerMaxTileRange = Math.floor(towerTileRange) + ((towerTileRange - Math.floor(towerTileRange)) > 0.5 ? 0.5 : 0);
+                        var towerAvgTileRange = (towerMaxTileRange + towerMinTileRange) / 2;
+
+                        var enemySecsInRange = (towerAvgTileRange / (tileEnemySpeed / (1 - waveInterval)));
+                        var shotsPerEnemy = Math.floor(enemySecsInRange / cooldown);
+                        var totalShots = shotsPerEnemy * enemyCount;
+
+                        var towerRealDmg = cooldown * towerDmg;
+
+                        var totalDmg = totalShots * towerCount * towerDmg;
+                        totalTowerDamage += totalDmg;
+
+                        var killedEnemies = totalDmg > 0 ? Math.floor(totalDmg / enemyHp) : 0;
+                        totalKilledEnemies += killedEnemies;
+
+                        tr.append($("<td/>").text(tower.id));
+                        tr.append($("<td/>").text(tower.cost));
+                        tr.append($("<td/>").text(cooldown));
+                        tr.append($("<td/>").text(towerDmg.toFixed(3)));
+                        tr.append($("<td/>").addClass("purple").text(towerRealDmg.toFixed(3)));
+                        tr.append($("<td/>").text(towerMinTileRange + "-" + towerMaxTileRange + " (" + towerAvgTileRange + ")"));
+
+                        var td = $("<td/>");
+
+                        function addButton(title, inc, where) {
+                            var li = $("<li/>");
+                            var btn = $("<button/>").addClass("btn btn-default t-count-button").data("role", "button");
+                            btn.attr("data-wave", waveIndex);
+                            btn.attr("data-tower", tower.id);
+                            btn.attr("data-money", money);
+                            btn.text(title);
+                            btn.click(function () {
+                                increaseTower($(this).attr("data-wave"), $(this).attr("data-tower"), inc, parseInt($(this).attr("data-money"), 10));
+                                update();
+                            });
+                            btn.prop("disabled", inc < 0 ? !(towerCount >= Math.abs(inc)) : !(money - (tower.cost * Math.abs(inc)) >= 0));
+                            li.append(btn);
+                            where.append(li);
+                        }
+
+                        var tcountNav = $("<ul/>").addClass("nav nav-pills");
+
+                        addButton("-10", -10, tcountNav);
+                        addButton("-5", -5, tcountNav);
+                        addButton("-", -1, tcountNav);
+
+                        tcountNav.append($("<li/>").text(towerCount).addClass("t-count-value"));
+
+                        addButton("+", 1, tcountNav);
+                        addButton("+5", 5, tcountNav);
+                        addButton("+10", 10, tcountNav);
+
+                        td.append(tcountNav);
+
+                        tr.append(td);
+                        tr.append($("<td/>").text(tileEnemySpeed.toFixed(3)));
+                        tr.append($("<td/>").text(enemy.health));
+                        tr.append($("<td/>").addClass("blue").text(totalHp.toFixed(3)));
+                        tr.append($("<td/>").addClass("blue").text(enemySecsInRange.toFixed(3)));
+                        tr.append($("<td/>").addClass("blue").text(shotsPerEnemy));
+                        tr.append($("<td/>").addClass("blue").text(totalShots));
+                        tr.append($("<td/>").addClass("blue").text(totalDmg.toFixed(3)));
+                        tr.append($("<td/>").addClass("blue").text(killedEnemies));
+                        //tr.append();
+                        tbl.append(tr);
+                    }
+
+                    var killHp = totalTowerDamage - totalHp;
+                    var success = killHp >= 0;
+
+                    txt = "Remaing E-HP: " + killHp;
+                    txt += ", Total killed: " + totalKilledEnemies;
+                    div.append($("<p/>").addClass(success ? "green" : "red").text(txt));
+                    output.append(div);
+                }
+            })();
+        };
+        resMng.start();
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+{
+    "enemies": [
+        {
+            "id": "enemy-1",
+            "speed": 0.6,
+            "health": 40,
+            "armor": 0,
+            "bounty": 10,
+            "sizeFactor": 0.2,
+            "color": "white"
+        },
+        {
+            "id": "enemy-2",
+            "speed": 0.6,
+            "health": 50,
+            "armor": 0,
+            "bounty": 15,
+            "sizeFactor": 0.25,
+            "color": "white"
+        },
+        {
+            "id": "enemy-3",
+            "speed": 0.6,
+            "health": 60,
+            "armor": 0,
+            "bounty": 20,
+            "sizeFactor": 0.275,
+            "color": "white"
+        },
+        {
+            "id": "enemy-4",
+            "speed": 0.6,
+            "health": 75,
+            "armor": 0,
+            "bounty": 25,
+            "sizeFactor": 0.3,
+            "color": "white"
+        },
+        {
+            "id": "enemy-5",
+            "speed": 0.65,
+            "health": 100,
+            "armor": 0,
+            "bounty": 30,
+            "sizeFactor": 0.35,
+            "color": "white"
+        },
+        {
+            "id": "enemy-6",
+            "speed": 0.65,
+            "health": 125,
+            "armor": 0,
+            "bounty": 40,
+            "sizeFactor": 0.4,
+            "color": "white"
+        },
+        {
+            "id": "enemy-7-boss",
+            "speed": 0.25,
+            "health": 1500,
+            "armor": 0,
+            "bounty": 100,
+            "sizeFactor": 0.75,
+            "color": "white"
+        },
+        {
+            "id": "enemy-8",
+            "speed": 0.4,
+            "health": 150,
+            "armor": 0,
+            "bounty": 50,
+            "sizeFactor": 0.5,
+            "color": "white"
+        },
+        {
+            "id": "enemy-9",
+            "speed": 0.4,
+            "health": 200,
+            "armor": 0,
+            "bounty": 75,
+            "sizeFactor": 0.55,
+            "color": "white"
+        },
+        {
+            "id": "enemy-10-mass",
+            "speed": 0.5,
+            "health": 250,
+            "armor": 0,
+            "bounty": 50,
+            "sizeFactor": 0.6,
+            "color": "white"
+        }
+    ]
+}

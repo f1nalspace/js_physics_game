@@ -1,0 +1,64 @@
+{
+  "towers": [
+    {
+      "id": "pistol",
+      "name": "Pistol Tower",
+      "weapon": "pistol",
+      "weaponmods": {
+      },
+      "cost": 150,
+      "image": "tower_small.png",
+      "hint": ""
+    },
+    {
+      "id": "shotgun",
+      "name": "Shotgun Tower",
+      "weapon": "shotgun",
+      "weaponmods": {
+      },
+      "cost": 300,
+      "image": "tower_small.png",
+      "hint": "S"
+    },
+    {
+      "id": "machinegun",
+      "name": "Machinegun Tower",
+      "weapon": "machinegun",
+      "weaponmods": {
+      },
+      "cost": 500,
+      "image": "tower_small.png",
+      "hint": "M"
+    },
+    {
+      "id": "grenade-launcher",
+      "name": "Grenade Tower",
+      "weapon": "grenade-launcher",
+      "weaponmods": {
+      },
+      "cost": 750,
+      "image": "tower_medium.png",
+      "hint": "G"
+    },
+    {
+      "id": "rocket",
+      "name": "Rocket Tower",
+      "weapon": "rocket-launcher",
+      "weaponmods": {
+      },
+      "cost": 1000,
+      "image": "tower_medium.png",
+      "hint": "R"
+    },
+    {
+      "id": "ice",
+      "name": "Ice Tower",
+      "weapon": "ice",
+      "weaponmods": {
+      },
+      "cost": 400,
+      "image": "tower.png",
+      "hint": "ICE"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+ECMAScript parsing infrastructure for multipurpose analysis:
+http://esprima.org/

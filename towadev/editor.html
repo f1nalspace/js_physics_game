@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Touwa Defu Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.css" type="text/css"/>
+
+    <script type="text/javascript" src="js/jquery-1.9.1.js"></script>
+    <script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
+    <script type="text/javascript" src="final/core.js"></script>
+    <script type="text/javascript" src="editor.js"></script>
+    <style type="text/css">
+        .actions-container {
+            padding-bottom: 1em;
+        }
+
+        #canvas-container {
+            text-align: center;
+        }
+
+        canvas {
+            width: 100%;
+            border: 1px solid red;
+        }
+    </style>
+</head>
+<body>
+<div class="container actions-container">
+    <div class="btn-toolbar actions-group" role="toolbar">
+        <div class="btn-group" role="group">
+            <button class="btn btn-default action-new">New</button>
+            <button class="btn btn-default action-load">Load</button>
+            <button class="btn btn-default action-save">Save</button>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <ul id="tabs" class="nav nav-tabs" role="tablist">
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_tiles" data-mode="1">Tiles</a></li>
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_entities" data-mode="2">Entities</a></li>
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_enemies">Enemies</a></li>
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_waves">Waves</a></li>
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_towers">Towers / Weapons</a></li>
+        <li role="presentation" role="tab" data-toggle="tab"><a href="#tab_game">Game</a></li>
+    </ul>
+</div>
+<div class="container">
+    <div id="canvas-container">
+        <canvas id="canvas" width="1280" height="720" tabindex="1"></canvas>
+    </div>
+    <div id="tabs_content" class="tab-content">
+        <div role="tabpanel" class="tab-pane" id="tab_tiles">
+            <h3>Tiles</h3>
+
+            <div class="btn-toolbar" role="toolbar">
+                <div class="btn-group tiles" role="group" data-toggle="buttons"></div>
+            </div>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="tab_entities">
+            <h3>Entities</h3>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="tab_enemies">
+            <h3>Enemies</h3>
+            <table class="table table-hover" id="enemies"></table>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="tab_waves">
+            <h3>Waves</h3>
+            <table class="table table-hover" id="waves"></table>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="tab_towers">
+            <div>
+                <h3>Towers</h3>
+                <table class="table table-hover" id="towers"></table>
+            </div>
+            <div>
+                <h3>Weapons</h3>
+                <table class="table table-hover" id="weapons"></table>
+            </div>
+        </div>
+        <div role="tabpanel" class="tab-pane" id="tab_game">
+            <h3>Game properties</h3>
+
+            <form role="form">
+                <div class="form-group">
+                    <label for="gameInitialMoney">Initial money:</label>
+                    <input type="number" class="form-control" id="gameInitialMoney" min="0"/>
+                </div>
+                <div class="form-group">
+                    <label for="gameWaveTimerDuration">Wave timer duration (in seconds):</label>
+                    <input type="number" class="form-control" id="gameWaveTimerDuration" min="0"/>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

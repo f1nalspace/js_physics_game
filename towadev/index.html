@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Touwa Defu - {{version}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <script type="text/javascript" src="final/core.js"></script>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+        }
+        canvas:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="1280" height="720" tabindex="1"></canvas>
+    <script type="text/javascript">
+        final.setLogLevel(final.LogLevel.Debug);
+        final.addSourcePath("final/", "^(final\\..*)$", false, "final");
+        final.addSourcePath("source/", "^(final\\.towadev)$", true, "final");
+        final.addSourcePath("source/", "^(final\\.towadev\\..*)$", true, "final");
+        final.load("final.towadev", function (final, towadev) {
+            var game = new towadev.TowaDev("canvas");
+            var head = document.getElementsByTagName("head")[0];
+            head.getElementsByTagName("title")[0].innerHTML = head.getElementsByTagName("title")[0].innerHTML.replace("{{version}}", game.version);
+            game.run();
+        });
+    </script>
+</body>
+</html>

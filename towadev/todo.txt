@@ -1,0 +1,66 @@
+Final Framework
+---------------
+
+- Fullscreen-Mode für App (http://www.html5rocks.com/en/mobile/fullscreen)
+
+- UI Push-Button (Ist sofort aktiv solange gedrückt)
+
+- UI Label
+
+Touwadev
+--------
+
+- Spiel
+    - Schwierigkeitsstufe (Leicht = 0.9, Normal = 1, Schwer = 1.1)
+    - Fast-Forward Knopf (Spiel schneller ablaufen zu lassen - bei gleicher Framerate)
+    - Alles in einem File, anstatt mehrere JSON files - damit ein Level aus einer einzigen Datei besteht
+    - Level-Auswahl mit Screenshot (Screenshot wird generiert)
+    - Status-Messages (Informationenstext der Zeitabhängig auf dem Spiel plaziert wird und nach n-sekunden wieder verschwindet)
+
+- Editor
+    - Speichern
+    - Bilder anzeigen
+
+- Darstellung
+    - Keine Bitmaps mehr verwenden, sondern Grafiken on-the-fly erzeugen mit Canvas
+        - Tower / Waffen
+        - Gegner
+        - Tiles (Prozedurale Texture-Generator!)
+    - Partikel für Rauch / Explosionen
+    - Glowing-Effekt für Hover:
+        var alpha = (this.game.gameTime.secs / 2) % 1;
+        if (alpha < 0.5) {
+            alpha = alpha * 2;
+        } else {
+            alpha = 1 - (alpha - 0.5) * 2;
+        }
+
+- Optionen
+    - Ton an/aus / Lautstärke
+
+- Kugel-Typen
+    - Dauerstrahl-Waffen (duration, weapon-type, keine einzelnen bullets, sondern nur eine Bullet die halt nen Laser ist)
+
+- Tower
+    - Tower-Unlocks:
+        - erst nach n-gebauten Towern der jeweiligen Klasse wird der nächste Tower freigeschaltet. (Zeigt "Unlock"-Hinweis an)
+        - erst ab Level-x verfügbar
+        - erst nach n getöteten Gegnern des typs x
+    - Turm-Upgrades
+        - Prozentual-erhöhte Upgrades
+    - Laser-Tower (damageType 'beam')
+    - Intelligenz-Upgrades (Zielsicherer):
+        - kleinste Distanz
+        - kleinste HP
+        - besser vorzielen
+    - Schusstypen:
+        - Nur wenn Gegner anvisieriert wurde, feuerbereit, Gegner nicht tot, Gegner noch in Reichweite
+        - Nur wenn Gegner anvisieriert wurde, feuerbereit, Gegner nicht tot
+        - Nur wenn Gegner anvisieriert wurde, feuerbereit - Fester Zielpunkt
+
+- Gegner
+    - Unterschiedliche gegner pro wave (Also eine liste von enemies anstatt einer festen enemy-id + toggling - interval bleibt aber gleich)
+    - Zeitabhängige Modifikationen (Positive sowie Negative Effekte aller Art: Langsam, Schnell, Mehr Leben, Weniger Leben, Elemente etc.)
+
+- Sounds
+  http://www.bfxr.net/
