@@ -50,14 +50,14 @@ canvas.addEventListener("mouseup", function (e) {
 
 var mapSize = {x: 10, y: 10};
 var tileCount = mapSize.x * mapSize.y;
-var tileSize = {x: 32, y: 32};
+var tileSize = {x: 64, y: 64};
 var tiles = [];
 for (var i = 0; i < tileCount; i++) {
     tiles[i] = 0;
 }
 
 var playerSize = {x: tileSize.x * 1, y: tileSize.y * 2};
-var playerPos = {x: 5 * tileSize.x - tileSize.x * 0.5, y: 3 * tileSize.y};
+var playerPos = {x: 5 * tileSize.x - tileSize.x * 0.5 + playerSize.x * 0.5, y: 3 * tileSize.y};
 var playerVel = {x: 0, y: 0};
 
 function setTile(x, y, tile) {
