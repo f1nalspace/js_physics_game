@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smoothed Particle Hydrodynamics with Javascript</title>
+    <script type="text/javascript" src="sph2.js"></script>
+    <style type="text/css">
+        body {
+            overflow: hidden;
+            line-height: 1em;
+            padding: 0;
+            margin: 0;
+        }
+        #outer {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+<canvas tabindex="1" id="canvas" width="600" height="600"></canvas>
+<div id="outer">
+    <div style="float:left;">
+        <p style="font-size: 1.2em; font-weight: bold;">Realtime SPH Fluid Simulation by Torsten Sp&auml;te
+            (HTML5/Javascript)</p>
+
+        <p>Smoothed Particle Hydrodynamics - based upon paper &quot;Particle-based Viscoelastic Fluid Simulation&quot;
+            (Clavet)</p>
+    </div>
+    <div style="float:right">
+        <p id="FPS"></p>
+    </div>
+</div>
+<script type="text/javascript" src="Stats.js"></script>
+<script type="text/javascript">
+    var canvas = document.getElementById("canvas");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 110;
+    document.getElementById("outer").style.width = canvas.width + "px";
+
+    var sample = new SPHApplication();
+    sample.run();
+
+    var stats = new Stats();
+    document.getElementById("FPS").appendChild(stats.domElement);
+    setInterval(function () {
+        stats.update();
+    }, 1000 / 60);
+
+</script>
+</body>
+</html>

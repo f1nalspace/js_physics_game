@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>finalgine Test</title>
+    <style>
+        .pass:before {
+            content: 'PASS: ';
+            color: blue;
+            font-weight: bold;
+        }
+
+        .fail:before {
+            content: 'FAIL: ';
+            color: red;
+            font-weight: bold;
+        }
+
+        .log:before {
+            content: '';
+            color: black;
+        }
+    </style>
+    
+    <!-- Standalone units -->
+    <script type="text/javascript" src="reflection.js"></script>
+    <script type="text/javascript" src="log.js"></script>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript" src="vector.js"></script>
+    <script type="text/javascript" src="geometry.js"></script>
+    <script type="text/javascript" src="grid.js"></script>
+    <script type="text/javascript" src="math.js"></script>
+    <script type="text/javascript" src="animation.js"></script>
+    <script type="text/javascript" src="timer.js"></script>
+</head>
+<body>
+<div id="output"></div>
+<script>
+    var output = document.getElementById('output');
+    var section = null;
+    function assert(outcome, description) {
+        var li = document.createElement('li');
+        li.className = outcome ? 'pass' : 'fail';
+        li.appendChild(document.createTextNode(description));
+        section.appendChild(li);
+        return outcome;
+    }
+
+    function log(text) {
+        var li = document.createElement('li');
+        li.className = 'log';
+        li.appendChild(document.createTextNode(text));
+        section.appendChild(li);
+    }
+
+    function addSection(description) {
+        var header = document.createElement("h3");
+        header.appendChild(document.createTextNode(description));
+        output.appendChild(header);
+        var ul = document.createElement("ul");
+        output.appendChild(ul);
+        section = ul;
+    }
+
+    function createCanvas2D(w,h) {
+        var li = document.createElement('li');
+        var canvas = document.createElement("canvas");
+        canvas.width = w || 512;
+        canvas.height = h || 256;
+        li.appendChild(canvas);
+        section.appendChild(li);
+        return canvas;
+    }
+    
+    function testJavascript() {
+    	addSection("Javascript");
+    	
+    	var a = new Object();
+    	a.pos = {x: 10, y: 20};
+    	var b = a.pos;
+    	b.x = 30;
+    	if (!assert(a.pos.x == 30 && a.pos.y == 20, "Object references")) return false;    
+    	
+    	return true;
+    }
+
+    function testVector2() {
+        addSection("Vector2");
+
+        if (!assert(finalgine.Vector2 !== undefined, "Vector2 class")) return false;
+
+        var a = new finalgine.Vector2();
+        if (!assert(a.x == 0 && a.y == 0, "Vector2 constructor (0 params)")) return false;
+        a = null;
+
+        a = new finalgine.Vector2(0.5);
+        if (!assert(a.x == 0.5 && a.y == 0.5, "Vector2 constructor (1 param float)")) return false;
+        a = null;
+
+        a = new finalgine.Vector2(0.53, -1.87);
+        if (!assert(a.x == 0.53 && a.y == -1.87, "Vector2 constructor (2 params float)")) return false;
+        a = null;
+
+        a = new finalgine.Vector2(0.5, -0.3);
+        var b = finalgine.Vector2(a);
+        if (!assert(b.x == 0.5 && b.y == -0.3, "Vector2 constructor assign float")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(0.3, -1.6);
+        if (!assert(a.toString() == "x: 0.3, y: -1.6", "Vector2 toString")) return false;
+        a = null;
+
+        // Add
+        a = new finalgine.Vector2(0.5, 0.0);
+        var b = a.add(1.0);
+        if (!assert(b.x == 1.5 && b.y == 1.0, "Vector2 add (1 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(0.5, 0.0);
+        var b = a.add(1.0, 0.75);
+        if (!assert(b.x == 1.5 && b.y == 0.75, "Vector2 add (2 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(0.5, 0.0);
+        var b = a.add(finalgine.Vector2(1.0, 0.75));
+        if (!assert(b.x == 1.5 && b.y == 0.75, "Vector2 add (1 params Vector2)")) return false;
+        a = null;
+        b = null;
+
+        // Subtract
+        a = new finalgine.Vector2(1.5, -0.5);
+        var b = a.sub(1.0);
+        if (!assert(b.x == 0.5 && b.y == -1.5, "Vector2 sub (1 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(1.5, -0.5);
+        var b = a.sub(1.0, 0.75);
+        if (!assert(b.x == 0.5 && b.y == -1.25, "Vector2 sub (2 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(1.5, -0.5);
+        var b = a.sub(finalgine.Vector2(1.0, 0.75));
+        if (!assert(b.x == 0.5 && b.y == -1.25, "Vector2 sub (1 params Vector2)")) return false;
+        a = null;
+        b = null;
+
+        // Divide
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.div(2.0);
+        if (!assert(b.x == 3.0 && b.y == -4.0, "Vector2 div (1 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.div(2.0, 4.0);
+        if (!assert(b.x == 3.0 && b.y == -2.0, "Vector2 div (2 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.div(finalgine.Vector2(2.0, 4.0));
+        if (!assert(b.x == 3.0 && b.y == -2.0, "Vector2 div (1 params Vector2)")) return false;
+        a = null;
+        b = null;
+
+        // Mul
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.mul(2.0);
+        if (!assert(b.x == 12.0 && b.y == -16.0, "Vector2 mul (1 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.mul(2.0, 4.0);
+        if (!assert(b.x == 12.0 && b.y == -32.0, "Vector2 mul (2 params float)")) return false;
+        a = null;
+        b = null;
+
+        a = new finalgine.Vector2(6.0, -8.0);
+        var b = a.mul(finalgine.Vector2(2.0, 4.0));
+        if (!assert(b.x == 12.0 && b.y == -32.0, "Vector2 mul (1 params Vector2)")) return false;
+        a = null;
+        b = null;
+
+        return true;
+    }
+
+    function testAll() {
+    	if (!testJavascript()) return false;
+        if (!testVector()) return false;
+        return true;
+    }
+
+    testAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Physics</title>
+<script type="text/javascript">
+// ---------------------------------------------------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------------------------------------------------
+window.requestAnimFrame = (function () {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+})();
+
+Function.prototype.inheritsFrom = function (parentClassOrObject) {
+    if (parentClassOrObject.constructor == Function) {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//Vector2
+//---------------------------------------------------------------------------------------------------------------------
+function Vector2(x, y) {
+    return {
+        x:x.x !== undefined && y === undefined ? x.x : x,
+        y:x.y !== undefined && y === undefined ? x.y : y,
+        halfX:function () {
+            return this.x / 2;
+        },
+        halfY:function () {
+            return this.y / 2;
+        },
+        dot:function (v) {
+            return (this.x * v.x) + (this.y * v.y);
+        },
+        sub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x - x.x, this.y - x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x - x, this.y - y);
+            } else {
+                return Vector2(this.x - x, this.y - x);
+            }
+        },
+        isub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x -= x.x;
+                this.y -= x.y;
+            } else if (y !== undefined) {
+                this.x -= x;
+                this.y -= y;
+            } else {
+                this.x -= x;
+                this.y -= x;
+            }
+        },
+        add:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x + x.x, this.y + x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x + x, this.y + y);
+            } else {
+                return Vector2(this.x + x, this.y + x);
+            }
+        },
+        iadd:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x += x.x;
+                this.y += x.y;
+            } else if (y !== undefined) {
+                this.x += x;
+                this.y += y;
+            } else {
+                this.x += x;
+                this.y += x;
+            }
+        },
+        mul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x * x.x, this.y * x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x * x, this.y * y);
+            } else {
+                return Vector2(this.x * x, this.y * x);
+            }
+        },
+        imul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x *= x.x;
+                this.y *= x.y;
+            } else if (y !== undefined) {
+                this.x *= x;
+                this.y *= y;
+            } else {
+                this.x *= x;
+                this.y *= x;
+            }
+        },
+        div:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x / x.x, this.y / x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x / x, this.y / y);
+            } else {
+                return Vector2(this.x / x, this.y / x);
+            }
+        },
+        idiv:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x /= x.x;
+                this.y /= x.y;
+            } else if (y !== undefined) {
+                this.x /= x;
+                this.y /= y;
+            } else {
+                this.x /= x;
+                this.y /= x;
+            }
+        },
+        lengthSqrt:function () {
+            return this.dot(this);
+        },
+        length:function () {
+            return Math.sqrt(this.lengthSqrt());
+        },
+        normalized:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            return Vector2(this.x / l, this.y / l);
+        },
+        normalize:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            this.x /= l;
+            this.y /= l;
+            return l;
+        },
+        perpRight:function () {
+            return Vector2(-this.y, this.x);
+        },
+        perpLeft:function () {
+            return Vector2(this.y, -this.x);
+        },
+        setup:function (x, y) {
+            if (x.x !== undefined && y === undefined) {
+                this.x = x.x;
+                this.y = x.y;
+            } else if (y !== undefined) {
+                this.x = x;
+                this.y = y;
+            } else {
+                this.x = x;
+                this.y = x;
+            }
+        },
+        clone:function () {
+            return Vector2(this.x, this.y);
+        },
+        toString:function () {
+            return this.x + ", " + this.y;
+        },
+        zero:function () {
+            this.x = 0;
+            this.y = 0;
+        }
+    };
+}
+
+function reflectVector(v, normal, bounciness, friction) {
+    // Project velocity on line normal
+    var projVelocity = v.dot(normal);
+    // Impact velocity vector
+    var impactVel = normal.mul(projVelocity);
+    // Tangent velocity vector (across the surface of collision)
+    var tangentVel = v.sub(impactVel);
+    // Velocity for bounciness
+    var velBounciness = Vector2(-impactVel.x * bounciness, -impactVel.y * bounciness);
+    // Velocity for friction
+    var velFriction = Vector2(tangentVel.x * (1.0 - friction), tangentVel.y * (1.0 - friction));
+    // Resulting velocity
+    return velBounciness.add(velFriction);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// AABB
+// ---------------------------------------------------------------------------------------------------------------------
+function AABB(pos, size) {
+    this.pos = pos;
+    this.size = size;
+    this.axis = [Vector2(1.0, 0.0), Vector2(0.0, 1.0)];
+}
+
+AABB.prototype.getRectangle = function () {
+    return {
+        x:this.pos.x - this.size.halfX(),
+        y:this.pos.y - this.size.halfY(),
+        w:this.size.x,
+        h:this.size.y
+    };
+};
+
+AABB.prototype.project = function (axis) {
+    var pos = this.pos.dot(axis);
+    var scale = Math.abs(axis.dot(this.axis[0])) * this.size.halfX() + Math.abs(axis.dot(this.axis[1])) * this.size.halfY();
+    return {
+        min:-scale,
+        max:+scale,
+        toString:function () {
+            return this.min + " - " + this.max;
+        }
+    };
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Body
+// ---------------------------------------------------------------------------------------------------------------------
+function Body(pos, size, color, mass) {
+    AABB.call(this, pos, size);
+    this.color = color;
+    this.mass = mass || 0;
+    this.invMass = this.mass > 0.00001 ? 1.0 / this.mass : 0.0;
+    this.force = Vector2(0, 0);
+    this.acc = Vector2(0, 0);
+    this.prevPos = Vector2(pos);
+}
+Body.inheritsFrom(AABB);
+
+Body.prototype.isStatic = function () {
+    return !(this.mass > 0.00001);
+};
+
+Body.prototype.addForce = function (v, dt) {
+    this.force.iadd(v.mul(this.mass));
+};
+
+Body.prototype.resetForce = function () {
+    this.force.zero();
+};
+
+Body.prototype.getVelocity = function() {
+	return this.pos.sub(this.prevPos);
+};
+
+Body.prototype.integrate = function (dt) {
+	// Add force to acceleration
+    this.acc.iadd(this.force);
+
+    // Verlet integration
+    var vel = this.getVelocity();
+    var position = this.pos.add(vel).add(this.acc.mul(dt * dt));
+    this.prevPos.setup(this.pos);
+    this.pos.setup(position);
+
+    // Reset acceleration
+    this.acc.zero();
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//SAT (Separating Axis Theorem)
+//---------------------------------------------------------------------------------------------------------------------
+var SAT = {};
+SAT.intervalIntersect = function (A, B, offset, vel, axis, penetrationNormal, penetrationDepth) {
+	// Project both boxes on current axis
+	var projection1 = A.project(axis);
+	var projection2 = B.project(axis);
+	
+	// Offset projection for A
+	var h = offset.dot(axis);
+	projection1.min += h;
+	projection1.max += h;
+	
+	// Get overlaps
+	var d0 = projection1.min - projection2.max;
+	var d1 = projection2.min - projection1.max;
+	
+	if (d0 > 0 || d1 > 0) {
+        // Project velocity on axis
+        var v = vel.dot(axis);
+        if (Math.abs(v) < 0.0001) {
+        	// No velocity on axis, therefore no overlap
+            return false;
+        }
+
+        var t0 = -d0 / v; // time of impact to d0 reaches 0
+        var t1 = d1 / v; // time of impact to d0 reaches 1
+
+        // Sort times
+        if (t0 > t1) {
+            var temp = t0;
+            t0 = t1;
+            t1 = temp;
+        }
+
+        // Take the minimum positive (0.9 smaller penetration > 0.5 bigger penetration)
+        var overlap = (t0 > 0.0) ? t0 : t1;
+
+        // Intersection time too late or back in time, no collision
+        if (overlap < 0.0 || overlap > 1.0) {
+            return false;
+        }
+        
+	    // Is overlap smaller than current penetration depth, overwrite it
+	    if (overlap > penetrationDepth.x || penetrationDepth.x == Number.MIN_VALUE) {
+	        penetrationNormal.setup(axis);
+	        penetrationDepth.x = overlap;
+	    }
+
+	    return true;
+	} else {
+	    // Get smallest overlap
+	    var overlap = d0 > d1 ? d0 : d1;
+	
+	    // Is overlap smaller than current penetration depth, overwrite it
+	    if (overlap > penetrationDepth.x || penetrationDepth.x == Number.MIN_VALUE) {
+	        penetrationNormal.setup(axis);
+	        penetrationDepth.x = overlap;
+	    }
+	
+	    return true;
+	}
+};
+
+SAT.getCollision = function (A, B, penetrationNormal, penetrationDepth) {
+	// Reset penetration results
+	penetrationNormal.zero();
+	penetrationDepth.setup(Number.MIN_VALUE, 0);
+	
+	// Get negative distance between A and B
+	var offset = A.pos.sub(B.pos);
+	var velA = A.getVelocity();
+	var velB = B.getVelocity();
+	var vel = velA.sub(velB);
+	
+	// Test velocity axis
+	var f = vel.dot(vel);
+	if (f > 0.00001) {
+	    var axis = vel.perpRight().normalized();
+	    if (!SAT.intervalIntersect(A, B, offset, vel, axis, penetrationNormal, penetrationDepth)) {
+	        return false;
+	    }
+	}
+	
+	// Test axis for A
+	for (var i in A.axis) {
+	    var axis = A.axis[i];
+	    if (!SAT.intervalIntersect(A, B, offset, vel, axis, penetrationNormal, penetrationDepth)) {
+	        return false;
+	    }
+	}
+	
+	// Test axis for B
+	for (var i in B.axis) {
+	    var axis = B.axis[i];
+	    if (!SAT.intervalIntersect(A, B, offset, vel, axis, penetrationNormal, penetrationDepth)) {
+	        return false;
+	    }
+	}
+	
+	// Ensure that the penetration normal is facing the right way
+	if (offset.dot(penetrationNormal) < 0.0) {
+	    penetrationNormal.imul(-1);
+	}
+	
+	return true;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sample
+// ---------------------------------------------------------------------------------------------------------------------
+var Keys = {
+    Left:37,
+    Right:39,
+    Up:38,
+    Down:40
+}
+
+function Sample() {
+    this.canvas = document.getElementById("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.bodies = [];
+    this.player = null;
+    this.keystate = [];
+    
+    this.bounciness = 1.0;
+    this.friction = 0.25;
+
+    this.font = "normal 14px verdana";
+
+    var that = this;
+
+    this.canvas.addEventListener("keydown", function (ev) {
+        that.keystate[ev.keyCode] = true;
+    }, false);
+    this.canvas.addEventListener("keyup", function (ev) {
+        that.keystate[ev.keyCode] = false;
+    }, false);
+}
+
+Sample.prototype.isKeyDown = function (key) {
+    return this.keystate[key] !== undefined && this.keystate[key] === true;
+}
+
+Sample.prototype.setKeyDown = function (key, value) {
+    this.keystate[key] = value;
+}
+
+Sample.prototype.addBody = function (pos, size, color, mass) {
+    var body = new Body(pos, size, color, mass);
+    this.bodies.push(body);
+    return body;
+};
+
+Sample.prototype.resolveCollision = function (A, B) {
+    var penetrationNormal = Vector2(0, 0);
+    var penetrationDepth = Vector2(Number.MIN_VALUE, 0);
+    if (SAT.getCollision(A, B, penetrationNormal, penetrationDepth)) {
+        var Va = A.getVelocity();
+        var Vb = B.getVelocity();
+        var Vr = Va.sub(Vb);
+        var N = penetrationNormal;
+    	if (penetrationDepth.x < 0.0) {
+	        if (B.isStatic()) {
+	            A.pos.isub(penetrationNormal.mul(penetrationDepth.x));
+	        } else {
+	            A.pos.isub(penetrationNormal.mul(penetrationDepth.x * 0.5));
+	            B.pos.iadd(penetrationNormal.mul(penetrationDepth.x * 0.5));
+	        }
+        }
+    }
+};
+
+Sample.prototype.resolveCollisions = function () {
+    // First collisions for dynamic bodies
+    for (var i in this.bodies) {
+        var bodyA = this.bodies[i];
+        for (var j in this.bodies) {
+            var bodyB = this.bodies[j];
+            if (bodyA !== bodyB && !bodyA.isStatic() && !bodyB.isStatic()) {
+                this.resolveCollision(bodyA, bodyB);
+            }
+        }
+    }
+
+    // Second collisions for dynamic bodies against static bodies
+    for (var i in this.bodies) {
+        var bodyA = this.bodies[i];
+        if (!bodyA.isStatic()) {
+            for (var j in this.bodies) {
+                var bodyB = this.bodies[j];
+                if (bodyA !== bodyB && bodyB.isStatic()) {
+                    this.resolveCollision(bodyA, bodyB);
+                }
+            }
+        }
+    }
+};
+
+Sample.prototype.init = function () {
+    // Add bottom box
+    this.addBody(Vector2(0, 150), Vector2(600, 50), "blue", 0);
+    // Add left box
+    this.addBody(Vector2(-325, 0), Vector2(50, 350), "darkblue", 0);
+    // Add right box
+    this.addBody(Vector2(325, 0), Vector2(50, 350), "darkblue", 0);
+
+    // Add player
+    this.player = this.addBody(Vector2(-150, -100), Vector2(50, 100), "red", 1000);
+    this.addBody(Vector2(150, -100), Vector2(50, 100), "yellow", 100);
+};
+
+Sample.prototype.update = function (dt) {
+    // Reset body forces
+    for (var i in this.bodies) {
+        this.bodies[i].resetForce();
+    }
+
+    // Add internal forces (Gravity)
+    for (var i in this.bodies) {
+        var body = this.bodies[i];
+        body.addForce(Vector2(0, 9.81), dt);
+    }
+
+    // Add external forces
+    if (this.isKeyDown(Keys.Up)) {
+        this.player.addForce(Vector2(0, -10), dt);
+    } else if (this.isKeyDown(Keys.Down)) {
+        this.player.addForce(Vector2(0, 10), dt);
+    }
+    if (this.isKeyDown(Keys.Left)) {
+        this.player.addForce(Vector2(-10, 0), dt);
+    } else if (this.isKeyDown(Keys.Right)) {
+        this.player.addForce(Vector2(10, 0), dt);
+    }
+
+    // Update bodies
+    for (var i in this.bodies) {
+        if (!this.bodies[i].isStatic()) {
+            this.bodies[i].integrate(dt);
+        }
+    }
+
+    // Resolve collisions
+    this.resolveCollisions();
+};
+
+Sample.prototype.renderRectangle = function (rect, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+};
+
+Sample.prototype.renderLine = function (x1, y1, x2, y2, color, lineWidth) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderText = function (x, y, text, color, baseline, align) {
+    this.ctx.fillStyle = color;
+    this.ctx.font = this.font;
+
+    this.ctx.textBaseline = baseline || "middle";
+    this.ctx.textAlign = align || "center";
+
+    this.ctx.fillText(text, x, y);
+};
+
+Sample.prototype.render = function () {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw black background
+    this.ctx.fillStyle = "black";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save translation and move to center on the canvas
+    this.ctx.save();
+    this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+
+    // Render boxes
+    for (var i in this.bodies) {
+        var body = this.bodies[i];
+        var boundBox = body.getRectangle();
+        this.renderRectangle(boundBox, body.color);
+    }
+    
+    // Render text
+    var vel = this.player.getVelocity();
+    this.renderText(-this.canvas.width / 2, -this.canvas.height / 2, "Vel: " + vel.toString(), "white", "top", "left");
+
+    // Restore translation
+    this.ctx.restore();
+};
+
+Sample.prototype.run = function () {
+    this.init();
+    var that = this;
+    var dt = 1.0 / 60;
+    var step = dt;
+    var time = 0;
+    (function gameLoop() {
+        requestAnimFrame(gameLoop);
+        time += dt;
+        while (dt && time >= step) {
+	        that.update(dt);
+	        time -= step;
+        }
+        that.render();
+    })();
+};
+</script>
+</head>
+<body>
+<canvas tabindex="1" id="canvas" width="800" height="480"></canvas>
+<script type="text/javascript">
+    var sample = new Sample();
+    sample.run();
+</script>
+</body>
+</html>

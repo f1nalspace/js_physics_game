@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Particles</title>
+<script type="text/javascript">
+// ---------------------------------------------------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------------------------------------------------
+window.requestAnimFrame = (function () {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+})();
+
+window.performance = window.performance || {};
+performance.now = (function () {
+    return performance.now ||
+            performance.mozNow ||
+            performance.msNow ||
+            performance.oNow ||
+            performance.webkitNow ||
+            function () {
+                return new Date().getTime();
+            };
+})();
+
+Function.prototype.inheritsFrom = function (parentClassOrObject) {
+    if (parentClassOrObject.constructor == Function) {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+function UniqueId() {
+}
+UniqueId.prototype._id = 0;
+UniqueId.prototype.generateId = function () {
+    return (++UniqueId.prototype._id).toString();
+};
+function HashTable() {
+    this.hash = {};
+    this.count = 0;
+
+    this.getCount = function () {
+        return this.count;
+    };
+
+    this.getKeys = function() {
+        return this.hash;
+    };
+
+    this.contains = function (key) {
+        if (typeof key === "string" || typeof key === "number") {
+            return this.hash[key] !== undefined;
+        }
+        if (key._hashtableUniqueId !== undefined) {
+            return this.hash[key._hashtableUniqueId] !== undefined;
+        }
+        return false;
+    };
+
+    this.put = function (key, value) {
+        if (typeof key === "string" || typeof key === "number") {
+            this.hash[key] = value;
+            this.count++;
+        } else {
+            if (key._hashtableUniqueId === undefined) {
+                key._hashtableUniqueId = UniqueId.prototype.generateId();
+            }
+            this.hash[key._hashtableUniqueId] = value;
+            this.count++;
+        }
+    };
+
+    this.get = function (key) {
+        if (typeof key === "string" || typeof key === "number") {
+            return this.hash[key];
+        }
+        if (key._hashtableUniqueId === undefined) {
+            return undefined;
+        }
+        return this.hash[key._hashtableUniqueId];
+    };
+
+    this.remove = function (key) {
+        if (typeof key === "string" || typeof key === "number") {
+            delete this.hash[key];
+            this.count--;
+        } else if (key._hashtableUniqueId !== undefined) {
+            delete this.hash[key._hashtableUniqueId];
+            this.count--;
+        }
+    }
+}
+
+var Constants = {};
+Constants.EPSILON = 1.192092896e-07;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Vec3
+// ---------------------------------------------------------------------------------------------------------------------
+function Vec3(x, y, z) {
+    return {
+        x:x,
+        y:y,
+        z:z,
+        round:function () {
+            this.x = Math.round(this.x);
+            this.y = Math.round(this.y);
+            this.z = Math.round(this.z);
+        },
+        toString:function () {
+            return this.x + ", " + (this.y) + ", " + (this.z);
+        }
+    };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Vec2
+// ---------------------------------------------------------------------------------------------------------------------
+function Vec2(x, y) {
+    return {
+        x:x.x !== undefined && y === undefined ? x.x : x,
+        y:x.y !== undefined && y === undefined ? x.y : y,
+        halfX:function () {
+            return this.x / 2;
+        },
+        halfY:function () {
+            return this.y / 2;
+        },
+        dot:function (v) {
+            return (this.x * v.x) + (this.y * v.y);
+        },
+        sub:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                return Vec2(this.x - x.x, this.y - x.y);
+            } else if (typeof y != "undefined") {
+                return Vec2(this.x - x, this.y - y);
+            } else {
+                return Vec2(this.x - x, this.y - x);
+            }
+        },
+        isub:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                this.x -= x.x;
+                this.y -= x.y;
+            } else if (typeof y != "undefined") {
+                this.x -= x;
+                this.y -= y;
+            } else {
+                this.x -= x;
+                this.y -= x;
+            }
+        },
+        add:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                return Vec2(this.x + x.x, this.y + x.y);
+            } else if (typeof y != "undefined") {
+                return Vec2(this.x + x, this.y + y);
+            } else {
+                return Vec2(this.x + x, this.y + x);
+            }
+        },
+        iadd:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                this.x += x.x;
+                this.y += x.y;
+            } else if (typeof y != "undefined") {
+                this.x += x;
+                this.y += y;
+            } else {
+                this.x += x;
+                this.y += x;
+            }
+        },
+        mul:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                return Vec2(this.x * x.x, this.y * x.y);
+            } else if (typeof y != "undefined") {
+                return Vec2(this.x * x, this.y * y);
+            } else {
+                return Vec2(this.x * x, this.y * x);
+            }
+        },
+        imul:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                this.x *= x.x;
+                this.y *= x.y;
+            } else if (typeof y != "undefined") {
+                this.x *= x;
+                this.y *= y;
+            } else {
+                this.x *= x;
+                this.y *= x;
+            }
+        },
+        div:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                return Vec2(this.x / x.x, this.y / x.y);
+            } else if (typeof y != "undefined") {
+                return Vec2(this.x / x, this.y / y);
+            } else {
+                return Vec2(this.x / x, this.y / x);
+            }
+        },
+        idiv:function (x, y) {
+            if (typeof x == "object" && typeof y == "undefined") {
+                this.x /= x.x;
+                this.y /= x.y;
+            } else if (typeof y != "undefined") {
+                this.x /= x;
+                this.y /= y;
+            } else {
+                this.x /= x;
+                this.y /= x;
+            }
+        },
+        length:function () {
+            return Math.sqrt(this.lengthSqrt());
+        },
+        lengthSqrt:function () {
+            return this.dot(this);
+        },
+        normalized:function () {
+            var l = Math.sqrt(this.length());
+            if (l == 0) {
+                l = 1;
+            }
+            return Vec2(this.x / l, this.y / l);
+        },
+        normalize:function () {
+            var l = Math.sqrt(this.length());
+            if (l == 0) {
+                l = 1;
+            }
+            this.x /= l;
+            this.y /= l;
+            return l;
+        },
+        perpRight:function () {
+            return Vec2(-this.y, this.x);
+        },
+        perpLeft:function () {
+            return Vec2(this.y, -this.x);
+        },
+        setup:function (x, y) {
+            if (x.x !== undefined && y === undefined) {
+                this.x = x.x;
+                this.y = x.y;
+            } else if (y !== undefined) {
+                this.x = x;
+                this.y = y;
+            } else {
+                this.x = x;
+                this.y = x;
+            }
+        },
+        clone:function () {
+            return Vec2(this.x, this.y);
+        },
+        toString:function () {
+            return this.x + ", " + this.y;
+        },
+        zero:function () {
+            this.x = 0;
+            this.y = 0;
+        },
+        abs: function(){
+            return Vec2(Math.abs(this.x), Math.abs(this.y));
+        }
+    };
+}
+
+function randomInRange(min, max) {
+    return Math.random() < 0.5 ? ((1 - Math.random()) * (max - min) + min) : (Math.random() * (max - min) + min);
+}
+
+function getRandomVector2(min, max) {
+    return Vec2(randomInRange(min, max), randomInRange(min, max));
+}
+
+function getRandomVector3(min, max) {
+    return Vec3(randomInRange(min, max), randomInRange(min, max), randomInRange(min, max));
+}
+
+function Plane(normal, distance, length, color) {
+    var n = distance === undefined ? normal.normalized() : normal;
+    var d = distance || normal.lengthSqrt();
+    return {
+        n:n,
+        d:d,
+        l:length,
+        c:color,
+        point:function () {
+            return this.n.mul(this.d);
+        },
+        getAABB: function(size){
+            var planeWidth = (this.l * 0.5);
+            var tangent = this.n.perpRight();
+            var radius = this.n.mul(size).add(tangent.mul(planeWidth)).abs();
+            return AABB(this.point(), radius);
+        }
+    }
+}
+
+function AABB(center, radius) {
+    return {
+        center: center,
+        radius: radius,
+        intersectsWith: function(other) {
+            var distance = other.center.sub(this.center);
+            var radiusBoth = this.radius.add(other.radius);
+            return (Math.abs(distance.x) < radiusBoth.x) && (Math.abs(distance.y) < radiusBoth.y);
+        }
+    };
+}
+
+function Solver() {
+    this.damping = 0.0;
+}
+
+Solver.prototype.solve = function(position, positionOld, velocity, force, timeStep){
+};
+
+function Verlet() {
+    Solver.call(this);
+}
+Verlet.inheritsFrom(Solver);
+
+Verlet.prototype.solve = function(position, positionOld, velocity, force, timeStep){
+    var t;
+    var oldPos = position.clone();
+
+    // Position = Position + (1.0f - Damping) * (Position - PositionOld) + dt * dt * a;
+    t = position.sub(positionOld);
+    t.imul(1.0 - this.damping);
+    t.iadd(force.mul(timeStep * timeStep));
+    position.iadd(t);
+    positionOld.setup(oldPos);
+
+    // Velocity = (Position - PositionOld) / dt;
+    t = position.sub(positionOld);
+    velocity.setup(t.div(timeStep));
+};
+
+function Particle(pos, radius, color) {
+    this.prevPos = pos.clone();
+    this.pos = pos;
+    this.vel = Vec2(0, 0);
+    this.force = Vec2(0, 0);
+    this.radius = radius;
+    this.color = color;
+    this.location = {x:-1, y:-1};
+    this.index = -1;
+    this.density = 0.0;
+    this.pressure = 0.0;
+    this.mass = 1.0;
+    this.neighbors = [];
+    this.solver = new Verlet();
+    this.solver.damping = 0.01;
+}
+
+Particle.prototype.addForce = function (F) {
+    this.force.iadd(F);
+};
+
+Particle.prototype.resetForce = function () {
+    this.force.zero();
+};
+
+Particle.prototype.integrate = function (dt) {
+    this.solver.solve(this.pos, this.prevPos, this.vel, this.force, dt);
+    this.force.zero();
+
+    /*
+    var acc = this.force;
+    var vel = this.getVelocity();
+    var position = this.pos.add(vel).add(acc.mul(dt * dt));
+    this.prevPos.setup(this.pos);
+    this.pos.setup(position);
+    */
+};
+
+Particle.prototype.getSweepAABB = function() {
+    var l = Math.min(this.prevPos.x, this.pos.x) - this.radius;
+    var t = Math.min(this.prevPos.y, this.pos.y) - this.radius;
+    var r = Math.max(this.prevPos.x, this.pos.x) + this.radius;
+    var b = Math.max(this.prevPos.y, this.pos.y) + this.radius;
+    var p1 = Vec2(l, t);
+    var p2 = Vec2(r, b);
+    var radius = p2.sub(p1).mul(0.5);
+    return AABB(p1.add(radius), radius);
+};
+
+Particle.prototype.getVelocity = function() {
+    return this.vel;
+};
+
+function ParticleSystem(origin, cellSize) {
+    this.origin = origin;
+    this.cellSize = cellSize;
+    this.cells = new HashTable();
+    this.particles = [];
+    this.stats = {
+        cells: 0,
+        buckets: 0
+    };
+}
+
+ParticleSystem.prototype.getLocation = function (particle) {
+    var x = Math.floor((particle.pos.x - this.origin.x) / this.cellSize);
+    var y = Math.floor((particle.pos.y - this.origin.y) / this.cellSize);
+    return {x:x, y:y};
+};
+
+ParticleSystem.prototype.insert = function (particle) {
+    var loc = this.getLocation(particle);
+    var xCells = this.cells.get(loc.x);
+    if (xCells === undefined) {
+        xCells = new HashTable();
+        this.cells.put(loc.x, xCells);
+    }
+
+    var cell = xCells.get(loc.y);
+    if (cell === undefined) {
+        cell = {
+            x:loc.x,
+            y:loc.y,
+            buckets:new HashTable()
+        };
+        xCells.put(loc.y, cell);
+        this.stats.cells++;
+    }
+
+    particle.location.x = loc.x;
+    particle.location.y = loc.y;
+
+    if (particle.index == -1) {
+        particle.index = this.particles.length;
+        this.particles[particle.index] = particle;
+    }
+
+    cell.buckets.put(particle, particle);
+};
+
+ParticleSystem.prototype.getCell = function (x, y) {
+    var xCells = this.cells.get(x);
+    if (xCells !== undefined) {
+        var cell = xCells.get(y);
+        return cell !== undefined ? cell : null;
+    } else {
+        return null;
+    }
+};
+
+ParticleSystem.prototype.updateCells = function(particle) {
+    // Get new particle cell location
+    var newLoc = this.getLocation(particle);
+
+    // Particle has moved to another cell?
+    if (newLoc.x != particle.location.x || newLoc.y != particle.location.y) {
+        // Remove particle from cell
+        var oldLoc = particle.location;
+        var xCells = this.cells.get(oldLoc.x);
+        var cell = xCells.get(oldLoc.y);
+        cell.buckets.remove(particle);
+
+        // Cell empty - Remove cell from Y axis
+        if (cell.buckets.getCount() == 0) {
+            xCells.remove(oldLoc.y);
+            this.stats.cells--;
+        }
+
+        // X Axis does not contains any Y axis, remove it
+        if (xCells.getCount() == 0) {
+            this.cells.remove(oldLoc.x);
+        }
+
+        // Re-insert particle
+        this.insert(particle);
+    } else {
+        // No change in cell, no need to update cell
+    }
+};
+
+ParticleSystem.prototype.findNeighbors = function(particle) {
+    particle.neighbors = [];
+    for (var ny = -1; ny < 2; ny++) {
+        for (var nx = -1; nx < 2; nx++) {
+            var x = particle.location.x + nx;
+            var y = particle.location.y + ny;
+            var cell = this.getCell(x, y);
+            if (cell != null) {
+                var keys = cell.buckets.getKeys();
+                for (var key in keys) {
+                    if (keys.hasOwnProperty(key)) {
+                        var other = cell.buckets.get(key);
+                        if (other.index != particle.index) {
+                            particle.neighbors.push(other);
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+
+function SmoothingKernel(kernelSize) {
+    this.factor = 1.0;
+    this.setKernelSize(kernelSize);
+}
+
+SmoothingKernel.prototype.setKernelSize = function(value) {
+    this.kernelSize   = value;
+    this.kernelSizeSq = value * value;
+    this.kernelSize3  = value * value * value;
+    this.calculateFactor();
+};
+
+SmoothingKernel.prototype.calculateFactor = function() {
+};
+
+SmoothingKernel.prototype.calculate = function(r) {
+};
+
+SmoothingKernel.prototype.calculateGradient = function(r) {
+};
+
+SmoothingKernel.prototype.calculateLaplacian = function(r) {
+};
+
+/*----------------------------------------------------------------------------------------------------------------------
+ Smoothing Kernel - Poly6
+ ----------------------------------------------------------------------------------------------------------------------*/
+function SKPoly6(kernelSize){
+    SmoothingKernel.call(this, kernelSize);
+}
+SKPoly6.inheritsFrom(SmoothingKernel);
+
+SKPoly6.prototype.calculateFactor = function() {
+    var kernelRad9 = Math.pow(this.kernelSize, 9.0);
+    this.factor = (315.0 / (64.0 * Math.PI * kernelRad9));
+};
+
+SKPoly6.prototype.calculate = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return 0.0;
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var diffSq = this.kernelSizeSq - lenSq;
+    return this.factor * diffSq * diffSq * diffSq;
+};
+
+SKPoly6.prototype.calculateGradient = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return Vec2(0, 0);
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var diffSq = this.kernelSizeSq - lenSq;
+    var f = -this.factor * 6.0 * diffSq * diffSq;
+    return Vec2(r.x * f, r.y * f);
+};
+
+SKPoly6.prototype.calculateLaplacian = function(r) {
+    throw Error("Not implemented!");
+};
+
+/*----------------------------------------------------------------------------------------------------------------------
+Smoothing Kernel - Spiky
+----------------------------------------------------------------------------------------------------------------------*/
+function SKSpiky(kernelSize){
+    SmoothingKernel.call(this, kernelSize);
+}
+SKSpiky.inheritsFrom(SmoothingKernel);
+
+SKSpiky.prototype.calculateFactor = function() {
+    var kernelRad6 = Math.pow(this.kernelSize, 6.0);
+    this.factor = (15.0 / (Math.PI * kernelRad6));
+};
+
+SKSpiky.prototype.calculate = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return 0.0;
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var f = this.kernelSize - Math.sqrt(lenSq);
+    return this.factor * f * f * f;
+};
+
+SKSpiky.prototype.calculateGradient = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return Vec2(0, 0);
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var len = Math.sqrt(lenSq);
+    var f = -this.factor * 3.0 * (this.kernelSize - len) * (this.kernelSize - len) / len;
+    return Vec2(r.x * f, r.y * f);
+};
+
+SKSpiky.prototype.calculateLaplacian = function(r) {
+    throw Error("Not implemented!");
+};
+
+/*----------------------------------------------------------------------------------------------------------------------
+ Smoothing Kernel - Viscosity
+ ----------------------------------------------------------------------------------------------------------------------*/
+function SKViscosity(kernelSize){
+    SmoothingKernel.call(this, kernelSize);
+}
+SKViscosity.inheritsFrom(SmoothingKernel);
+
+SKViscosity.prototype.calculateFactor = function() {
+    this.factor = (15.0 / (2.0 * Math.PI * this.kernelSize3));
+};
+
+SKViscosity.prototype.calculate = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return 0.0;
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var len = Math.sqrt(lenSq);
+    var len3 = len * len * len;
+    return this.factor * (((-len3 / (2.0 * this.kernelSize3)) + (lenSq / this.kernelSizeSq) + (this.kernelSize / (2.0 * len))) - 1.0);
+};
+
+SKViscosity.prototype.calculateGradient = function(r) {
+    throw Error("Not implemented!");
+};
+
+SKViscosity.prototype.calculateLaplacian = function(r) {
+    var lenSq = r.lengthSqrt();
+    if (lenSq > this.kernelSizeSq) {
+        return 0.0;
+    }
+    if (lenSq < Constants.EPSILON) {
+        lenSq = Constants.EPSILON;
+    }
+    var len = Math.sqrt(lenSq);
+    return this.factor * (6.0 / this.kernelSize3) * (this.kernelSize - len);
+};
+
+function SPHSimulation(origin, cellSize) {
+    ParticleSystem.call(this, origin, cellSize);
+    this.coGas = 0.1;
+    this.coDensityOffset = 100.0;
+    this.coViscosity = 0.002;
+    this.skGeneral = new SKPoly6(cellSize);
+    this.skPressure = new SKSpiky(cellSize);
+    this.skViscosity = new SKViscosity(cellSize);
+    this.gravity = Vec2(0, 9.81);
+}
+SPHSimulation.inheritsFrom(ParticleSystem);
+
+SPHSimulation.prototype.calculateDensity = function(particle) {
+    particle.density = 0.0;
+    var neighbors = particle.neighbors;
+    for (var nIdx = 0; nIdx < neighbors.length; nIdx++)
+    {
+        var other = neighbors[nIdx];
+        var dist = other.pos.sub(particle.pos);
+        particle.density += particle.mass * this.skGeneral.calculate(dist);
+    }
+};
+
+SPHSimulation.prototype.calculateDensityAndPressure = function(){
+    var that = this;
+    this.particles.forEach(function (particle) {
+        that.calculateDensity(particle);
+        particle.pressure = that.coGas * (particle.density - that.coDensityOffset);
+    });
+};
+
+SPHSimulation.prototype.calculateForces = function() {
+    var that = this;
+    var scalar, f;
+
+    this.particles.forEach(function (particle) {
+        // Add global force to every particle
+        //particle.addForce(that.gravity.mul(particle.mass));
+
+        var neighbors = particle.neighbors;
+        for (var nIdx = 0; nIdx < neighbors.length; nIdx++)
+        {
+            var other = neighbors[nIdx];
+
+            if (other.density > Constants.EPSILON) {
+                var dist = other.pos.sub(particle.pos);
+
+                // Pressure
+                scalar = other.mass * (particle.pressure + other.pressure) / (2.0 * other.density);
+                f = that.skPressure.calculateGradient(dist);
+                f.imul(scalar);
+                particle.addForce(f.mul(-1));
+                other.addForce(f);
+
+                /*
+                // viscosity
+                var lap = that.skViscosity.calculateLaplacian(dist);
+                scalar = (other.mass * lap * that.coViscosity * 1.0) / other.density;
+                f = other.getVelocity().sub(particle.getVelocity());
+                f.imul(scalar);
+                particle.addForce(f);
+                other.addForce(f.mul(-1));
+                */
+            }
+        }
+
+    });
+};
+
+SPHSimulation.prototype.adjustDistances = function() {
+    var minDist = 0.5 * this.cellSize;
+    var minDistSq = minDist * minDist;
+    var dist;
+    this.particles.forEach(function (particle) {
+        var neighbors = particle.neighbors;
+        for (var nIdx = 0; nIdx < neighbors.length; nIdx++)
+        {
+            var other = neighbors[i];
+            dist = other.pos.sub(particle.pos);
+            var distLenSq = dist.lengthSqrt();
+            if (distLenSq < minDistSq)
+            {
+                if (distLenSq > Constants.EPSILON) {
+                    var distLen = Math.sqrt(distLenSq);
+                    dist = dist.mul(0.5 * (distLen - minDist) / distLen);
+                    other.pos.isub(dist);
+                    other.prevPos.isub(dist);
+                    particle.pos.iadd(dist);
+                    particle.prevPos.iadd(dist);
+                }
+            } else {
+                var diff = 0.5 * minDist;
+                other.pos.y -= diff;
+                other.prevPos.y -= diff;
+                particle.pos.y += diff;
+                particle.prevPos.y += diff;
+            }
+        }
+    });
+};
+
+SPHSimulation.prototype.update = function (dt) {
+    var that = this;
+
+    // Find neighbors
+    this.particles.forEach(function (particle) {
+        that.findNeighbors(particle);
+    });
+
+    // Calculate density and pressure
+    this.calculateDensityAndPressure();
+
+    // Calculate forces
+    this.calculateForces();
+
+    // Update
+    this.particles.forEach(function (particle) {
+        particle.integrate(dt);
+        that.updateCells(particle);
+    });
+};
+
+SPHSimulation.prototype.createBlob = function(posx, posy, w, h, radius, cellSpace, particleMass) {
+    var d = cellSpace * 0.9;
+    var cx = w / d;
+    var cy = h / d;
+    var pw = (d * cx) * 0.5;
+    var ph = (d * cy) * 0.5;
+    var sx = posx - pw;
+    for (var x = 0; x < cx; x++) {
+        var sy = posy - ph;
+        for (var y = 0; y < cx; y++) {
+            var particlePos = Vec2(sx, sy);
+            var particle = new Particle(particlePos, radius, "white");
+            particle.mass = particleMass;
+            this.insert(particle);
+            sy += d;
+        }
+        sx += d;
+    }
+};
+
+function findClosestPointOnPlane(pos, plane) {
+    var planePoint = plane.point();
+    var planeTangent = plane.n.perpRight();
+    var planePointA = planePoint.add(planeTangent.mul(plane.d));
+    var pointLineStartDistance = pos.sub(planePointA);
+    var proj = pointLineStartDistance.dot(planeTangent);
+    var proj_v = planeTangent.mul(proj);
+    return proj_v.add(planePointA);
+}
+
+function reflectVector(v, normal, bounciness, friction) {
+    // Project velocity on line normal
+    var projVelocity = v.dot(normal);
+    // Impact velocity vector
+    var impactVel = normal.mul(projVelocity);
+    // Tangent velocity vector (across the surface of collision)
+    var tangentVel = v.sub(impactVel);
+    // Velocity for bounciness
+    var velBounciness = Vec2(-impactVel.x * bounciness, -impactVel.y * bounciness);
+    // Velocity for friction
+    var velFriction = Vec2(tangentVel.x * (1.0 - friction), tangentVel.y * (1.0 - friction));
+    // Resulting velocity
+    return velBounciness.add(velFriction);
+}
+
+function collisionResponse(circle, normal, time, bounciness, friction) {
+    var curPos = circle.prevPos;
+    var nextPos = circle.pos;
+    var velocity = circle.getVelocity();
+
+    // Get corrected velocity based on collision time / factor
+    var correctedVelocity = velocity.sub(velocity.mul(1.0 - time));
+
+    // Calculate new position based on corrected velocity
+    var newPosition = curPos.add(correctedVelocity);
+    nextPos.setup(newPosition);
+
+    // Now reflect original velocity based on collision normal
+    var reflectedVelocity = reflectVector(velocity, normal, bounciness, friction);
+
+    // Setup new velocity (Change previous position to setup new velocity)
+    curPos.setup(newPosition.sub(reflectedVelocity));
+}
+
+function circlePlaneIntersection(circle, plane, bounciness, friction) {
+    // Save vars for faster access
+    var radius = circle.radius;
+    var curPos = circle.prevPos;
+    var nextPos = circle.pos;
+    var normal = plane.n.mul(-1);
+
+    // Get velocity
+    var velocity = circle.getVelocity();
+
+    // Find closest point on line for current pos
+    var curClosest = findClosestPointOnPlane(curPos, plane);
+
+    // Get distance to closest point
+    var curDistanceVector = curClosest.sub(curPos);
+
+    // Project distance on collision normal and subtract the radius
+    var curDistance = -curDistanceVector.dot(normal) - radius;
+
+    // Project velocity on collision normal
+    var projVel = -velocity.dot(normal);
+
+    if (projVel > Constants.EPSILON && projVel > curDistance) {
+        // Time = Cur distance / projected velocity
+        var time = curDistance / projVel;
+
+        // Do a collision response
+        collisionResponse(circle, normal, time, bounciness, friction);
+    } else {
+        // Normal collision detection
+        var closestPoint = findClosestPointOnPlane(nextPos, plane);
+
+        // Get distance between closest point on line and next position
+        var normalDistanceVector = closestPoint.sub(nextPos);
+
+        // Project normal distance vector on collision normal and subtract the radius
+        var normalDistance = -normalDistanceVector.dot(normal) - radius;
+        if (normalDistance < 0) {
+            // Calculate corrected position to fix penetration
+            var correctedPosition = nextPos.add(normal.mul(-normalDistance));
+
+            // Setup new position (New have no velocity, therefore reset both positions)
+            nextPos.setup(correctedPosition);
+            curPos.setup(nextPos);
+        }
+    }
+}
+
+function fastPlaneAABBCollision(plane, aabb) {
+    var planeAABB = plane.getAABB(aabb.radius);
+    return planeAABB.intersectsWith(aabb);
+}
+
+function getRandomColor() {
+    var rndColor = getRandomVector3(0, 255);
+    rndColor.round();
+    return "rgb(" + rndColor.toString() + ")";
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sample
+// ---------------------------------------------------------------------------------------------------------------------
+var Keys = {
+    Left:37,
+    Right:39,
+    Up:38,
+    Down:40
+};
+
+function Sample() {
+    this.canvas = document.getElementById("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.keystate = [];
+    this.mouse = Vec2(-1, -1);
+    this.mousestate = [];
+
+    this.bounciness = 1.0;
+    this.friction = 0.0;
+
+    this.font = "normal 10px verdana";
+
+    this.planes = [];
+    this.particleRadius = 20 * 0.5;
+    this.cellSize = this.particleRadius * 2.0;
+    this.particleMass = this.cellSize * 50;
+    this.particleSystem = null;
+    this.blobSize = 6;
+
+    this.collisionChecks = 0;
+
+    var lineOffset = 20;
+    var b = {
+        l:-(this.canvas.width / 2),
+        r:+(this.canvas.width / 2),
+        t:-(this.canvas.height / 2),
+        b:+(this.canvas.height / 2)
+    };
+
+    b.l += lineOffset;
+    b.r -= lineOffset;
+    b.t += lineOffset;
+    b.b -= lineOffset;
+    this.boundRect = b;
+
+    var that = this;
+
+    var getXandY = function (e) {
+        var x = e.clientX - that.canvas.getBoundingClientRect().left;
+        var y = e.clientY - that.canvas.getBoundingClientRect().top;
+        return Vec2(x - (that.canvas.width / 2), y - (that.canvas.height / 2));
+    };
+
+    this.canvas.addEventListener("keydown", function (ev) {
+        that.keystate[ev.keyCode] = true;
+    }, false);
+    this.canvas.addEventListener("keyup", function (ev) {
+        that.keystate[ev.keyCode] = false;
+    }, false);
+    this.canvas.addEventListener("mousedown", function (ev) {
+        that.mouse = getXandY(ev);
+        that.mousestate[ev.button] = true;
+    }, false);
+    this.canvas.addEventListener("mouseup", function (ev) {
+        that.mousestate[ev.button] = false;
+    }, false);
+    this.canvas.addEventListener("mousemove", function (ev) {
+        that.mouse = getXandY(ev);
+    }, false);
+}
+
+Sample.prototype.isKeyDown = function (key) {
+    return this.keystate[key] !== undefined && this.keystate[key] === true;
+};
+
+Sample.prototype.setKeyDown = function (key, value) {
+    this.keystate[key] = value;
+};
+
+Sample.prototype.isMouseDown = function (button) {
+    return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+};
+
+Sample.prototype.setMouseButton = function (button, value) {
+    this.mousestate[button] = value;
+};
+
+/*
+Sample.prototype.addRandomParticle = function (boundRect, color, dt, pos) {
+    var radius = this.particleRadius;
+    var particlePos = pos || Vec2(randomInRange(boundRect.l + radius, boundRect.r - radius), randomInRange(boundRect.t + radius, boundRect.b - radius));
+    var particle = new Particle(particlePos, radius, color);
+    var startDirection = getRandomVector2(-1, 1);
+    var speed = 1000;
+    particle.prevPos.iadd(startDirection.mul(speed * dt));
+    this.particleSystem.insert(particle);
+};
+*/
+
+Sample.prototype.init = function () {
+    var b = this.boundRect;
+    var w = b.r - b.l;
+    var h = b.b - b.t;
+
+    this.planes.push(new Plane(Vec2(-1.0, 0.0), w / 2, h, "blue"));
+    this.planes.push(new Plane(Vec2(1.0, 0.0), w / 2, h, "blue"));
+    this.planes.push(new Plane(Vec2(0.0, -1.0), h / 2, w, "red"));
+    this.planes.push(new Plane(Vec2(0.0, 1.0), h / 2, w, "red"));
+
+    var dt = 1.0 / 60;
+
+    // Init particle system
+    this.particleSystem = new SPHSimulation(Vec2(0, 0), this.cellSize);
+    this.particleSystem.gravity = Vec2(0.0, 9.81);
+
+    this.particleSystem.createBlob(0, 0, this.particleSystem.cellSize * this.blobSize, this.particleSystem.cellSize * this.blobSize, this.particleRadius, this.particleSystem.cellSize, this.particleMass);
+};
+
+Sample.prototype.update = function (dt) {
+    // Reset collision checks
+    this.collisionChecks = 0;
+
+    // Add new particle on mouse click
+    if (this.isMouseDown(0)) {
+        this.particleSystem.createBlob(this.mouse.x, this.mouse.y, this.particleSystem.cellSize * this.blobSize, this.particleSystem.cellSize * this.blobSize, this.particleRadius, this.particleSystem.cellSize, this.particleMass);
+
+        // Disable this to have more phun
+        this.setMouseButton(0, false);
+    }
+
+    // Update particles
+    this.particleSystem.update(0.05);
+
+    // Collision between particles and planes
+    var that = this;
+    var particles = this.particleSystem.particles;
+    var i, j;
+    for (i = 0; i < this.planes.length; i++) {
+        var plane = this.planes[i];
+        particles.forEach(function (particle) {
+            var aabb = particle.getSweepAABB();
+            if (fastPlaneAABBCollision(plane, aabb)) {
+                that.collisionChecks++;
+                circlePlaneIntersection(particle, plane, that.bounciness, that.friction);
+            }
+        });
+    }
+};
+
+Sample.prototype.renderRectangle =  function (rect, color) {
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeStyle = color;
+    this.ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    this.ctx.lineWidth = 1;
+};
+
+Sample.prototype.renderLine = function (x1, y1, x2, y2, color, lineWidth) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderText = function (x, y, text, color, baseline, align) {
+    this.ctx.fillStyle = color;
+    this.ctx.font = this.font;
+
+    this.ctx.textBaseline = baseline || "middle";
+    this.ctx.textAlign = align || "center";
+
+    this.ctx.fillText(text, x, y);
+};
+
+Sample.prototype.renderCircle = function (x, y, radius, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+    this.ctx.fill();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderAABB = function(aabb, color) {
+    var center = Vec2(aabb.center.x - aabb.radius.x, aabb.center.y - aabb.radius.y);
+    this.renderRectangle({x: center.x, y: center.y, w: aabb.radius.x * 2, h: aabb.radius.y * 2}, color);
+};
+
+Sample.prototype.render = function () {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw black background
+    this.ctx.fillStyle = "black";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save translation and move to center on the canvas
+    this.ctx.save();
+    this.ctx.translate(this.canvas.width * 0.5, this.canvas.height * 0.5);
+
+    var that = this;
+
+    // Draw boundary planes
+    that.planes.forEach(function(plane){
+        var planeNormal = plane.n;
+        var planeTangent = planeNormal.perpRight();
+        var planePos = plane.point();
+        var planePosStart = planePos.add(planeTangent.mul(plane.l * 0.5));
+        var planePosEnd = planePosStart.add(planeTangent.mul(-1).mul(plane.l));
+
+        //var planeAABB = plane.getAABB(Vec2(this.particleRadius, this.particleRadius));
+        //this.renderAABB(planeAABB, "darkblue");
+
+        this.renderLine(planePosStart.x, planePosStart.y, planePosEnd.x, planePosEnd.y, plane.c, 2.0);
+    }, that);
+
+
+    // Draw particles
+    var particles = this.particleSystem.particles;
+    var cellSize = that.particleSystem.cellSize;
+    particles.forEach(function (particle) {
+        var cx = that.particleSystem.origin.x + (particle.location.x * cellSize);
+        var cy = that.particleSystem.origin.y + (particle.location.y * cellSize);
+        //that.renderRectangle({x:cx, y:cy, w:cellSize, h:cellSize}, "green");
+
+        var neighbors = particle.neighbors;
+        for (var i = 0; i  < neighbors.length; i++) {
+            var other = neighbors[i];
+            var cx = that.particleSystem.origin.x + (other.location.x * cellSize);
+            var cy = that.particleSystem.origin.y + (other.location.y * cellSize);
+            //that.renderRectangle({x:cx, y:cy, w:cellSize, h:cellSize}, "yellow");
+        }
+
+        that.renderCircle(particle.pos.x, particle.pos.y, particle.radius * 0.25, particle.color);
+
+        //that.renderText(particle.pos.x, particle.pos.y, particle.pressure, "red", "middle", "center");
+    });
+
+    // Draw OSD
+    this.renderText(-(this.canvas.width * 0.5), -(this.canvas.height * 0.5), "collisionChecks: " + this.collisionChecks, "yellow", "top", "left");
+    this.renderText(-(this.canvas.width * 0.5), -(this.canvas.height * 0.5) + 10, "cells: " + this.particleSystem.stats.cells, "yellow", "top", "left");
+    this.renderText(-(this.canvas.width * 0.5), -(this.canvas.height * 0.5) + 20, "particles: " + this.particleSystem.particles.length, "yellow", "top", "left");
+
+    // Restore translation
+    this.ctx.restore();
+};
+
+Sample.prototype.run = function () {
+    this.init();
+    var that = this;
+    var dt = 1.0 / 60;
+    (function gameLoop() {
+        that.update(dt);
+        that.render();
+        requestAnimFrame(gameLoop);
+    })();
+};
+</script>
+</head>
+<body>
+<canvas tabindex="1" id="canvas" width="800" height="480"></canvas>
+<script type="text/javascript">
+    var sample = new Sample();
+    sample.run();
+</script>
+</body>
+</html>

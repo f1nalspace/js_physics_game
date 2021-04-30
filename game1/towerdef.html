@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src="Stats.js"></script>
+    <script type="text/javascript" src="vec2.js"></script>
+    <script type="text/javascript" src="towerdef.js"></script>
+    <style type="text/css">
+        body {
+            overflow: hidden;
+            line-height: 1em;
+            padding: 0;
+            margin: 0;
+        }
+        #outer {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+<canvas tabindex="1" id="canvas" width="1024" height="640"></canvas>
+<div id="outer">
+    <div style="float:right">
+        <p id="FPS"></p>
+    </div>
+</div>
+<script type="text/javascript">
+    var canvas = document.getElementById("canvas");
+    document.getElementById("outer").style.width = canvas.width + "px";
+
+    var game = new TowerDef();
+    game.run();
+
+    var stats = new Stats();
+    document.getElementById("FPS").appendChild(stats.domElement);
+    setInterval(function () {
+        stats.update();
+    }, 1000 / 60);
+
+</script>
+</body>
+</html>

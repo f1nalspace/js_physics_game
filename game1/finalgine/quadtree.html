@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quad Tree</title>
+    <style>
+        html {
+            font-family: monospace, sans-serif;
+            font-size: 12pt;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            font-size: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: none;
+            outline: none;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+    </style>
+
+    <!-- Standalone units -->
+    <script type="text/javascript" src="reflection.js"></script>
+    <script type="text/javascript" src="log.js"></script>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript" src="vector.js"></script>
+    <script type="text/javascript" src="geometry.js"></script>
+    <script type="text/javascript" src="grid.js"></script>
+    <script type="text/javascript" src="quadtree.js"></script>
+    <script type="text/javascript" src="math.js"></script>
+    <script type="text/javascript" src="animation.js"></script>
+    <script type="text/javascript" src="timer.js"></script>
+    <script type="text/javascript" src="profiler.js"></script>
+
+    <!-- Entity / Level -->
+    <script type="text/javascript" src="entity.js"></script>
+    <script type="text/javascript" src="tilemap.js"></script>
+
+    <!-- Collision -->
+    <script type="text/javascript" src="sat.js"></script>
+    <script type="text/javascript" src="collision.js"></script>
+
+    <!-- Particles -->
+    <script type="text/javascript" src="particles.js"></script>
+    <script type="text/javascript" src="sph.js"></script>
+
+    <!-- Camera -->
+    <script type="text/javascript" src="camera.js"></script>
+
+    <!-- Core -->
+    <script type="text/javascript" src="renderer.js"></script>
+    <script type="text/javascript" src="asset_manager.js"></script>
+    <script type="text/javascript" src="loadscreen.js"></script>
+    <script type="text/javascript" src="gameengine.js"></script>
+    <script type="text/javascript" src="game.js"></script>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script type="text/javascript">
+    function QuadTreeDemo() {
+        finalgine.GameEngine.call(this);
+        this.rects = [];
+        this.mouseDown = false;
+        this.mouseStart = finalgine.Vector2(-1, -1);
+        this.mouseEnd = finalgine.Vector2(-1, -1);
+        this.quadTree = new finalgine.QuadTree(finalgine.Vector2(-(this.screenRes.x / 2), -(this.screenRes.y / 2)), this.screenRes);
+        this.player = finalgine.AABB(finalgine.Vector2(-50, -50), finalgine.Vector2(50, 50));
+    }
+    QuadTreeDemo.inheritsFrom(finalgine.GameEngine);
+
+    QuadTreeDemo.prototype.updateGame = function (dt) {
+        if (this.isMouseDown(finalgine.MouseButton.Left)) {
+            if (!this.mouseDown) {
+                this.mouseDown = true;
+                this.mouseStart.setup(this.mouse.x, this.mouse.y);
+                this.mouseEnd.setup(this.mouse.x, this.mouse.y);
+            } else {
+                this.mouseEnd.setup(this.mouse.x, this.mouse.y);
+            }
+        } else {
+            if (this.mouseDown) {
+                this.mouseEnd.setup(this.mouse.x, this.mouse.y);
+                this.mouseDown = false;
+                var min = finalgine.Vector2(Math.min(this.mouseStart.x, this.mouseEnd.x), Math.min(this.mouseStart.y, this.mouseEnd.y));
+                var max = finalgine.Vector2(Math.max(this.mouseStart.x, this.mouseEnd.x), Math.max(this.mouseStart.y, this.mouseEnd.y));
+                var rect = finalgine.Rectangle(min.x, min.y, max.x - min.x, max.y - min.y);
+                this.rects.push(rect);
+            }
+        }
+
+        if (this.isKeyDown(finalgine.Keys.A)) {
+            this.player.center.x -= 50 * dt;
+        } else if (this.isKeyDown(finalgine.Keys.D)) {
+            this.player.center.x += 50 * dt;
+        }
+        if (this.isKeyDown(finalgine.Keys.W)) {
+            this.player.center.y -= 50 * dt;
+        } else if (this.isKeyDown(finalgine.Keys.S)) {
+            this.player.center.y += 50 * dt;
+        }
+
+        // Clear entire quad tree
+        this.quadTree.clear();
+
+        // Insert player to quad tree
+        this.quadTree.insert(this.player);
+
+        // Insert rects
+        for (var i = 0; i < this.rects.length; i++) {
+            this.quadTree.insert(this.rects[i]);
+        }
+    };
+
+    QuadTreeDemo.prototype.renderGame = function (r) {
+        // Clear black
+        var s = this.screenRect();
+        r.fillRect(s.left(), s.top(), s.w, s.h, finalgine.Colors.Black);
+
+        // Draw rects
+        for (var i in this.rects) {
+            var rect = this.rects[i];
+            r.drawRect(rect.left(), rect.top(), rect.w, rect.h, finalgine.Colors.Blue);
+        }
+
+        // Draw quad tree
+        this.quadTree.draw(r, finalgine.Colors.Green, 1.0);
+
+        // Draw player
+        this.player.draw(r, finalgine.Colors.Red);
+
+        // Draw mouse rect
+        if (this.mouseDown) {
+            var min = finalgine.Vector2(Math.min(this.mouseStart.x, this.mouseEnd.x), Math.min(this.mouseStart.y, this.mouseEnd.y));
+            var max = finalgine.Vector2(Math.max(this.mouseStart.x, this.mouseEnd.x), Math.max(this.mouseStart.y, this.mouseEnd.y));
+            r.drawRect(min.x, min.y, max.x - min.x, max.y - min.y, finalgine.Colors.Red);
+        }
+    };
+
+    // Wrap our game into a anonymous function
+    (function () {
+        var demo = new QuadTreeDemo();
+        demo.canvas = document.getElementById("gameCanvas");
+        demo.run();
+    })();
+
+</script>
+</body>
+</html>

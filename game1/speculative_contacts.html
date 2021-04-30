@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Speculative Contacts</title>
+<script type="text/javascript">
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------------------------------------------------
+window.requestAnimFrame = (function () {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+})();
+
+Function.prototype.inheritsFrom = function (parentClassOrObject) {
+    if (parentClassOrObject.constructor == Function) {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//Vector2
+//---------------------------------------------------------------------------------------------------------------------
+function Vector2(x, y) {
+    return {
+        x:x.x !== undefined && y === undefined ? x.x : x,
+        y:x.y !== undefined && y === undefined ? x.y : y,
+        halfX:function () {
+            return this.x / 2;
+        },
+        halfY:function () {
+            return this.y / 2;
+        },
+        dot:function (v) {
+            return (this.x * v.x) + (this.y * v.y);
+        },
+        sub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x - x.x, this.y - x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x - x, this.y - y);
+            } else {
+                return Vector2(this.x - x, this.y - x);
+            }
+        },
+        isub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x -= x.x;
+                this.y -= x.y;
+            } else if (y !== undefined) {
+                this.x -= x;
+                this.y -= y;
+            } else {
+                this.x -= x;
+                this.y -= x;
+            }
+        },
+        add:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x + x.x, this.y + x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x + x, this.y + y);
+            } else {
+                return Vector2(this.x + x, this.y + x);
+            }
+        },
+        iadd:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x += x.x;
+                this.y += x.y;
+            } else if (y !== undefined) {
+                this.x += x;
+                this.y += y;
+            } else {
+                this.x += x;
+                this.y += x;
+            }
+        },
+        mul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x * x.x, this.y * x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x * x, this.y * y);
+            } else {
+                return Vector2(this.x * x, this.y * x);
+            }
+        },
+        imul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x *= x.x;
+                this.y *= x.y;
+            } else if (y !== undefined) {
+                this.x *= x;
+                this.y *= y;
+            } else {
+                this.x *= x;
+                this.y *= x;
+            }
+        },
+        div:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x / x.x, this.y / x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x / x, this.y / y);
+            } else {
+                return Vector2(this.x / x, this.y / x);
+            }
+        },
+        idiv:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x /= x.x;
+                this.y /= x.y;
+            } else if (y !== undefined) {
+                this.x /= x;
+                this.y /= y;
+            } else {
+                this.x /= x;
+                this.y /= x;
+            }
+        },
+        lengthSqrt:function () {
+            return this.dot(this);
+        },
+        length:function () {
+            return Math.sqrt(this.lengthSqrt());
+        },
+        normalized:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            return Vector2(this.x / l, this.y / l);
+        },
+        normalize:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            this.x /= l;
+            this.y /= l;
+            return l;
+        },
+        perpRight:function () {
+            return Vector2(-this.y, this.x);
+        },
+        perpLeft:function () {
+            return Vector2(this.y, -this.x);
+        },
+        setup:function (x, y) {
+            if (x.x !== undefined && y === undefined) {
+                this.x = x.x;
+                this.y = x.y;
+            } else if (y !== undefined) {
+                this.x = x;
+                this.y = y;
+            } else {
+                this.x = x;
+                this.y = x;
+            }
+        },
+        clone:function () {
+            return Vector2(this.x, this.y);
+        },
+        toString:function () {
+            return this.x + ", " + this.y;
+        },
+        zero:function () {
+            this.x = 0;
+            this.y = 0;
+        }
+    };
+}
+
+function Rectangle(x, y, w, h) {
+    return {
+        x:x,
+        y:y,
+        w:w,
+        h:h,
+        offset:function (x, y) {
+            this.x += x;
+            this.y += y;
+        },
+        left:function () {
+            return this.x;
+        },
+        right:function () {
+            return this.x + this.w;
+        },
+        top:function () {
+            return this.y;
+        },
+        bottom:function () {
+            return this.y + this.h;
+        },
+        intersectsWith:function (other) {
+            return (this.right() >= other.left() &&
+                    this.bottom() >= other.top()) && (this.left() <= other.right() && this.top() <= other.bottom());
+        }
+    };
+}
+
+function rectFromLTRB(l, t, r, b) {
+    return Rectangle(l, t, r - l, b - t);
+}
+
+function findClosestPointOnLine(pos, lineA, lineB, lineNormal) {
+    // Get distance vector between position and line start
+    var pointLineStartDistance = pos.sub(lineA);
+
+    // Project distance vector on line normal
+    var proj = pointLineStartDistance.dot(lineNormal);
+
+    // Get projection vector
+    var proj_v = lineNormal.mul(proj);
+
+    // Simply add the the projection vector the line start and we have our closest point on line
+    var closest = proj_v.add(lineA);
+
+    return closest;
+}
+
+function Body(pos) {
+    this.pos = pos;
+    this.vel = Vector2(0, 0);
+}
+Body.prototype.getAxis = function () {
+    throw new Error("Virtual function");
+};
+Body.prototype.getSize = function () {
+    throw new Error("Virtual function");
+};
+Body.prototype.project = function (axis) {
+    throw new Error("Virtual function");
+};
+Body.prototype.getVertices = function (offset) {
+    throw new Error("Virtual function");
+};
+Body.prototype.boundRect = function (offset) {
+    var p = this.pos.add(offset || Vector2(0, 0));
+    var s = this.getSize();
+    return Rectangle(p.x - s.halfX(), p.y - s.halfY(), s.x, s.y);
+};
+Body.prototype.velocityRect = function () {
+    var a = this.boundRect();
+    var b = this.boundRect(this.vel);
+    var l = Math.min(a.left(), b.left());
+    var t = Math.min(a.top(), b.top());
+    var r = Math.max(a.right(), b.right());
+    var b = Math.max(a.bottom(), b.bottom());
+    return Rectangle(l, t, r - l, b - t);
+};
+
+function OBB(pos, size) {
+    Body.call(this, pos);
+    this.axis = [Vector2(1.0, 0.0), Vector2(0.0, 1.0)];
+    this.size = size;
+}
+OBB.inheritsFrom(Body);
+
+OBB.prototype.getAxis = function () {
+    return this.axis;
+};
+OBB.prototype.getSize = function () {
+    return this.size;
+};
+
+OBB.prototype.project = function (axis) {
+    var scale = Math.abs(axis.dot(this.axis[0])) * this.size.halfX() + Math.abs(axis.dot(this.axis[1])) * this.size.halfY();
+    return {
+        min:-scale,
+        max:+scale,
+        toString:function () {
+            return this.min + " - " + this.max;
+        }
+    };
+};
+
+OBB.prototype.getVertices = function (offset) {
+    offset = offset || Vector2(0, 0);
+    return [
+        Vector2(offset.x + (this.size.halfX()), offset.y + (-this.size.halfY())),
+        Vector2(offset.x + (-this.size.halfX()), offset.y + (-this.size.halfY())),
+        Vector2(offset.x + (-this.size.halfX()), offset.y + (this.size.halfY())),
+        Vector2(offset.x + (this.size.halfX()), offset.y + (this.size.halfY()))
+    ];
+};
+
+function Circle(pos, radius) {
+    Body.call(this, pos);
+    this.radius = radius;
+}
+Circle.inheritsFrom(Body);
+
+Circle.prototype.getAxis = function () {
+    return this.axis;
+};
+Circle.prototype.getSize = function () {
+    return this.radius * 2;
+};
+
+Circle.prototype.project = function (axis) {
+    return {
+        min:-this.radius,
+        max:+this.radius,
+        toString:function () {
+            return this.min + " - " + this.max;
+        }
+    };
+};
+
+Circle.prototype.getVertices = function (offset) {
+    offset = offset || Vector2(0, 0);
+    return [offset];
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sample
+// ---------------------------------------------------------------------------------------------------------------------
+var Keys = {
+    Left:37,
+    Right:39,
+    Up:38,
+    Down:40
+}
+
+function Sample() {
+    this.canvas = document.getElementById("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.keystate = [];
+
+    this.mouse = Vector2(-1, -1);
+    this.mousestate = [];
+
+    this.bodyA = new OBB(Vector2(-150, -125), Vector2(150, 150));
+    this.bodyB = new OBB(Vector2(150, 125), Vector2(300, 150));
+
+    //this.bodyA.vel.setup(200, 150);
+    //this.bodyB.vel.setup(-250, -50);
+
+    this.font = "normal 14px verdana";
+
+    var that = this;
+
+    var getXandY = function (e) {
+        var x = e.clientX - that.canvas.getBoundingClientRect().left;
+        var y = e.clientY - that.canvas.getBoundingClientRect().top;
+        return Vector2(x - (that.canvas.width / 2), y - (that.canvas.height / 2));
+    };
+
+    this.canvas.addEventListener('contextmenu', function (evt) {
+        evt.preventDefault();
+    }, false);
+
+    this.canvas.addEventListener("keydown", function (ev) {
+        that.keystate[ev.keyCode] = true;
+    }, false);
+    this.canvas.addEventListener("keyup", function (ev) {
+        that.keystate[ev.keyCode] = false;
+    }, false);
+    this.canvas.addEventListener("mousedown", function (ev) {
+        that.mouse = getXandY(ev);
+        that.mousestate[ev.button] = true;
+    }, false);
+    this.canvas.addEventListener("mouseup", function (ev) {
+        that.mousestate[ev.button] = false;
+    }, false);
+    this.canvas.addEventListener("mousemove", function (ev) {
+        that.mouse = getXandY(ev);
+    }, false);
+}
+
+Sample.prototype.isKeyDown = function (key) {
+    return this.keystate[key] !== undefined && this.keystate[key] === true;
+}
+
+Sample.prototype.setKeyDown = function (key, value) {
+    this.keystate[key] = value;
+}
+
+Sample.prototype.isMouseDown = function (button) {
+    return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+}
+
+Sample.prototype.init = function () {
+};
+
+Sample.prototype.update = function (dt) {
+    var speed = 150;
+
+    if (this.isKeyDown(Keys.Left)) {
+        this.bodyA.pos.iadd(Vector2(-speed * dt, 0));
+    } else if (this.isKeyDown(Keys.Right)) {
+        this.bodyA.pos.iadd(Vector2(speed * dt, 0));
+    }
+
+    if (this.isKeyDown(Keys.Up)) {
+        this.bodyA.pos.iadd(Vector2(0, -speed * dt));
+    } else if (this.isKeyDown(Keys.Down)) {
+        this.bodyA.pos.iadd(Vector2(0, speed * dt));
+    }
+
+    // This is the simulation of the integration (vel += acc * dt, pos += vel * dt)
+    if (this.isMouseDown(0)) {
+        var displacement = this.mouse.clone();
+        this.bodyA.vel.setup(displacement.sub(this.bodyA.pos));
+    } else if (this.isMouseDown(2)) {
+        var displacement = this.mouse.clone();
+        //this.bodyB.vel.setup(displacement.sub(this.bodyB.pos));
+    }
+};
+
+Sample.prototype.renderRectangle = function (rect, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+    this.renderText(rect.x - 10, rect.y - 10, rect.x.toFixed(3) + ", " + rect.y.toFixed(3));
+    this.renderText(rect.right() + 10, rect.y - 10, rect.right().toFixed(3) + ", " + rect.y.toFixed(3));
+    this.renderText(rect.right() + 10, rect.bottom() + 10, rect.right().toFixed(3) + ", " + rect.bottom().toFixed(3));
+    this.renderText(rect.x - 10, rect.bottom() + 10, rect.x.toFixed(3) + ", " + rect.bottom().toFixed(3));
+};
+
+Sample.prototype.renderLine = function (x1, y1, x2, y2, color, lineWidth) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderText = function (x, y, text, color, baseline, align) {
+    this.ctx.fillStyle = color;
+    this.ctx.font = this.font;
+
+    this.ctx.textBaseline = baseline || "middle";
+    this.ctx.textAlign = align || "center";
+
+    this.ctx.fillText(text, x, y);
+};
+
+Sample.prototype.renderCircle = function (x, y, radius, color, strokeColor, lineWidth) {
+    this.ctx.fillStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    if (strokeColor !== undefined) {
+        this.ctx.strokeStyle = strokeColor;
+    }
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+    this.ctx.fill();
+    if (strokeColor !== undefined) {
+        this.ctx.stroke();
+    }
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderArrow = function (p1, p2, color, lineWidth) {
+    var v = p1.sub(p2);
+    var n = v.normalized();
+    var t = n.perpRight();
+    var p = n.perpLeft();
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, lineWidth);
+
+    var size = 20;
+
+    var ts = n.mul(0.9).add(t).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts.x, p2.y + ts.y, color, lineWidth);
+
+    var ts2 = n.mul(0.9).add(p).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts2.x, p2.y + ts2.y, color, lineWidth);
+};
+
+Sample.prototype.renderBoxProjection = function (proj, projOffset, screenSize, screenOffset, box, n, t, color) {
+    var lineCenter = t.mul(screenSize.add(screenOffset).mul(0.5));
+    var lineStart = lineCenter.add(n.mul(proj.min + projOffset));
+    var lineEnd = lineCenter.add(n.mul(proj.max + projOffset));
+    this.renderLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, color, 2);
+
+    //this.renderText(lineStart.x - (t.x * 24), lineStart.y - (t.y * 24), (proj.min + projOffset), "white");
+    //this.renderText(lineEnd.x - (t.x * 24), lineEnd.y - (t.y * 24), (proj.max + projOffset), "white");
+};
+
+Sample.prototype.renderBoxLines = function (pos, size, vel, color) {
+    color = color || "white";
+    var p1 = pos.add(Vector2(size.halfX(), size.halfY()));
+    var p2 = pos.add(vel).sub(Vector2(-size.halfX(), -size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, 1);
+    p1 = pos.add(Vector2(size.halfX(), -size.halfY()));
+    p2 = pos.add(vel).sub(Vector2(-size.halfX(), size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, 1);
+    var p1 = pos.add(Vector2(-size.halfX(), size.halfY()));
+    var p2 = pos.add(vel).sub(Vector2(size.halfX(), -size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, 1);
+    p1 = pos.add(Vector2(-size.halfX(), -size.halfY()));
+    p2 = pos.add(vel).sub(Vector2(size.halfX(), size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, 1);
+};
+
+Sample.prototype.render = function () {
+    var screenSize = Vector2(this.canvas.width, this.canvas.height);
+    var screenRect = Rectangle(-screenSize.halfX(), -screenSize.halfY(), screenSize.x, screenSize.y);
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw black background
+    this.ctx.fillStyle = "black";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save translation and move to center on the canvas
+    this.ctx.save();
+    this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+
+    var bodyA = this.bodyA;
+    var posA = bodyA.pos;
+    var velA = bodyA.vel;
+    var sizeA = bodyA.size;
+
+    var bodyB = this.bodyB;
+    var posB = bodyB.pos;
+    var velB = bodyB.vel;
+    var sizeB = bodyB.size;
+
+    var velRectA = bodyA.velocityRect();
+    var velRectB = bodyB.velocityRect();
+
+    // Draw body A
+    if (bodyA instanceof OBB) {
+        var rectA = bodyA.boundRect(velA);
+        this.renderRectangle(rectA, "blue");
+    }
+
+    // Draw body B
+    if (bodyB instanceof OBB) {
+        var rectB = bodyB.boundRect(velB);
+        this.renderRectangle(rectB, "red");
+    }
+
+    // Test edges of A against vertices of B
+    var vertsA = bodyA.getVertices(bodyA.pos.add(velA));
+    var vertsB = bodyB.getVertices(bodyB.pos.add(velB));
+    for (var i = 0; i < vertsA.length; i++) {
+        var A1 = vertsA[i];
+        var A2 = vertsA[i < vertsA.length - 1 ? i + 1 : 0];
+        var n = A2.sub(A1).normalized().perpRight();
+        this.renderText(A1.x, A1.y, i, "white");
+
+        // Project vertex A
+        var projA = A1.dot(n);
+
+        // Just for visualize test Y Axis
+        for (var j = 0; j < vertsB.length; j++) {
+            var B1 = vertsB[j];
+
+            // Get distance from current B to A point
+            var distanceVector = B1.sub(A1);
+
+            // Project that distance onto A normal
+            var proj = distanceVector.dot(n);
+
+            // Calculate closest point on normal
+            var closest = A1.add(n.mul(proj));
+
+            this.renderText(B1.x, B1.y, j, "white");
+            this.renderLine(A1.x, A1.y, closest.x, closest.y, "green");
+            this.renderCircle(closest.x, closest.y, 4, "yellow");
+            this.renderText(closest.x, closest.y + 16, n.toString(), "white");
+        }
+    }
+
+
+    /*
+     var screenWithOffset = screenSize.add(Vector2(-20, -20)).mul(0.5);
+     var axis = [Vector2(1.0, 0.0), Vector2(0.0, 1.0)];
+     for (var i in axis) {
+     var n = axis[i];
+
+     var t = n.perpRight();
+     var lineCenter = t.mul(screenWithOffset);
+     var lineStart = lineCenter.sub(n.mul(screenWithOffset));
+     var lineEnd = lineCenter.add(n.mul(screenWithOffset));
+     this.renderLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, "white", 1);
+
+     var textPos = lineCenter.add(t.mul(-80));
+
+     var projA = bodyA.project(n);
+     var projB = bodyB.project(n);
+
+     var p = distance.dot(n);
+
+     this.renderBoxProjection(projA, posA.dot(n), screenSize, Vector2(-40, -40), bodyA, n, t, "blue");
+     this.renderBoxProjection(projB, posB.dot(n), screenSize, Vector2(-60, -60), bodyB, n, t, "red");
+
+     projA.min += p;
+     projA.max += p;
+
+     // Get distances between the projections
+     var distance0 = projA.min - projB.max;
+     var distance1 = projB.min - projA.max;
+
+     // Render text
+     this.renderText(textPos.x, textPos.y - 32, "Axis: " + n.toString(), "yellow", "middle", "left");
+     this.renderText(textPos.x, textPos.y - 16, "Distance 0: " + distance0, "yellow", "middle", "left");
+     this.renderText(textPos.x, textPos.y, "Distance 1: " + distance1, "yellow", "middle", "left");
+
+     }
+     */
+
+    // Do have have a penetration?
+    //if (velRectA.intersectsWith(velRectB)) {
+    //this.renderText(-(this.canvas.width / 2), -(this.canvas.height / 2), "Intersection", "green", "top", "left");
+    //}
+
+    // Restore translation
+    this.ctx.restore();
+};
+
+Sample.prototype.run = function () {
+    this.init();
+    var that = this;
+    var dt = 1.0 / 60;
+    (function gameLoop() {
+        requestAnimFrame(gameLoop);
+        that.update(dt);
+        that.render();
+    })();
+};
+</script>
+</head>
+<body>
+<canvas tabindex="1" id="canvas" width="1200" height="680"></canvas>
+<script type="text/javascript">
+    var sample = new Sample();
+    sample.run();
+</script>
+</body>
+</html>

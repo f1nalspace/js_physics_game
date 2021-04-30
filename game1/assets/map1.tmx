@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="36" height="60" tilewidth="32" tileheight="32">
+ <tileset firstgid="1" name="tileset" tilewidth="32" tileheight="32">
+  <image source="tileset.png" width="128" height="128"/>
+ </tileset>
+ <layer name="Solid" width="36" height="60">
+  <data encoding="base64" compression="zlib">
+   eJztlEsOxDAIQ9v7X3r2FTa2SdosBimaDgnwEj73dV33YUuR+/GLdJWdGud0nuq/yoPeHOkUbiWvyfug2B0PEzemy8P0u3i6N3B6z80v4mHczvukovAk82cVj/JGle0KDiXnX/KwvWT+pAvxqHpHEi41Xzsl6bNJDlyerq7SuN38RDwOiyNOPzg8StxVuVNiKGcdfSJuL3Z6Z/44PE5e1LqobCq92geMmfFUTIxjdf7ZHor5Rn90cVVeZ4apXNW+YqfOs4TL4VF9p+L0sMPT2U9rcVrP6N5Tf6wXEp6UacKjzHbkS51DXW2oZ1RJcuLIn6f3r9RTxzNdiEfhn/Agu7d5Kj9Mn9wxuc/TlvEwO7S/q55X8aA3rL47LnRe4elql/GofYx4pv1c3WfK0/lDMuFmPlfyML9qfSOe7u1Vv0ycfH3Bw/bcutjN08WZ9OkOHkdcPnVvJc8KG6cX0p5HPtAZhUeJdSqP++bODE553N6b+Oy+mf9pDZzKk8xEtV6+XD9u6AMh
+  </data>
+ </layer>
+ <objectgroup name="Entities" width="36" height="60">
+  <object name="Start" type="PlayerStart" x="64" y="1120" width="32" height="32"/>
+  <object type="JumpPad" x="32" y="192" width="64" height="32"/>
+  <object type="JumpPad" x="32" y="448" width="64" height="32"/>
+  <object type="JumpPad" x="704" y="288" width="64" height="32"/>
+  <object type="JumpPad" x="736" y="32" width="32" height="64"/>
+  <object type="JumpPad" x="864" y="160" width="64" height="32"/>
+  <object type="JumpPad" x="800" y="384" width="64" height="32"/>
+  <object type="JumpPad" x="448" y="544" width="64" height="32"/>
+  <object type="JumpPad" x="256" y="640" width="64" height="32"/>
+  <object type="JumpPad" x="64" y="800" width="64" height="32"/>
+  <object type="JumpPad" x="352" y="864" width="64" height="32"/>
+  <object type="JumpPad" x="864" y="704" width="64" height="32"/>
+  <object type="JumpPad" x="256" y="1120" width="64" height="32"/>
+  <object type="JumpPad" x="384" y="1376" width="64" height="32"/>
+  <object type="JumpPad" x="608" y="1536" width="64" height="32"/>
+  <object type="JumpPad" x="864" y="1184" width="64" height="32"/>
+  <object type="JumpPad" x="1056" y="1568" width="64" height="32"/>
+  <object type="JumpPad" x="32" y="1632" width="64" height="32"/>
+  <object type="JumpPad" x="512" y="1760" width="64" height="32"/>
+  <object type="JumpPad" x="864" y="1856" width="64" height="32"/>
+  <object type="JumpPad" x="1056" y="1856" width="64" height="32"/>
+  <object type="JumpPad" x="32" y="1856" width="64" height="32"/>
+  <object name="14" type="Lever" x="32" y="256" width="32" height="32"/>
+  <object name="15" type="Lever" x="736" y="448" width="32" height="32"/>
+  <object name="16" type="Lever" x="288" y="160" width="32" height="32"/>
+  <object name="1" type="Lever" x="32" y="928" width="32" height="32"/>
+  <object name="17" type="Lever" x="448" y="928" width="32" height="32"/>
+  <object name="2" type="Lever" x="32" y="1312" width="32" height="32"/>
+  <object name="3" type="Lever" x="480" y="1248" width="32" height="32"/>
+  <object name="10" type="Lever" x="864" y="1248" width="32" height="32"/>
+  <object name="6" type="Lever" x="544" y="1536" width="32" height="32"/>
+  <object name="7" type="Lever" x="224" y="1568" width="32" height="32"/>
+  <object name="5" type="Lever" x="1056" y="1376" width="32" height="32"/>
+  <object name="13" type="Lever" x="480" y="672" width="32" height="32"/>
+  <object name="9" type="Lever" x="640" y="672" width="32" height="32"/>
+  <object type="MovingPlatform" x="288" y="1312" width="64" height="16"/>
+  <object type="MovingPlatform" x="384" y="1664" width="64" height="16"/>
+  <object type="MovingPlatform" x="960" y="1344" width="64" height="16"/>
+  <object type="MovingPlatform" x="832" y="1472" width="64" height="16"/>
+  <object name="4" type="Lever" x="224" y="1728" width="32" height="32"/>
+  <object name="8" type="Lever" x="736" y="1696" width="32" height="32"/>
+  <object type="MovingPlatform" x="544" y="1152" width="64" height="16"/>
+  <object type="MovingPlatform" x="128" y="320" width="64" height="16"/>
+  <object name="12" type="Lever" x="1088" y="192" width="32" height="32"/>
+  <object name="11" type="Lever" x="896" y="256" width="32" height="32"/>
+  <object name="A" type="FluidClear" x="480" y="1856" width="32" height="32"/>
+ </objectgroup>
+ <objectgroup name="Fluid" width="36" height="60">
+  <object type="Lava" x="640" y="512" width="64" height="32"/>
+  <object type="Lava" x="128" y="352" width="576" height="32"/>
+  <object type="Lava" x="768" y="512" width="64" height="32"/>
+  <object type="Lava" x="960" y="800" width="160" height="64"/>
+  <object type="Lava" x="256" y="96" width="64" height="32"/>
+  <object type="Lava" x="160" y="800" width="64" height="32"/>
+  <object type="Lava" x="160" y="96" width="64" height="32"/>
+  <object type="Lava" x="256" y="800" width="64" height="32"/>
+  <object name="A" type="Lava" x="32" y="1760" width="320" height="128"/>
+  <object type="Lava" x="768" y="1792" width="64" height="64"/>
+  <object type="Lava" x="704" y="1376" width="96" height="64"/>
+  <object type="Lava" x="128" y="1472" width="128" height="64"/>
+  <object type="Lava" x="576" y="1792" width="64" height="64"/>
+  <object type="Lava" x="96" y="960" width="96" height="64"/>
+  <object type="Lava" x="672" y="1792" width="64" height="64"/>
+  <object type="Lava" x="192" y="1344" width="64" height="32"/>
+  <object name="4" type="LavaDoor" x="256" y="1248" width="32" height="64"/>
+  <object name="3" type="LavaDoor" x="448" y="1280" width="32" height="128"/>
+  <object name="6" type="LavaDoor" x="256" y="1408" width="32" height="64"/>
+  <object name="1" type="LavaDoor" x="448" y="1056" width="32" height="96"/>
+  <object name="5" type="LavaDoor" x="608" y="1408" width="64" height="32"/>
+  <object name="8" type="LavaDoor" x="864" y="992" width="64" height="32"/>
+  <object name="11" type="LavaDoor" x="928" y="576" width="32" height="64"/>
+  <object name="12" type="LavaDoor" x="512" y="736" width="32" height="160"/>
+  <object name="2" type="LavaDoor" x="544" y="896" width="64" height="32"/>
+  <object name="16" type="LavaDoor" x="320" y="928" width="32" height="96"/>
+  <object name="8" type="LavaDoor" x="736" y="992" width="64" height="32"/>
+  <object name="13" type="LavaDoor" x="320" y="736" width="32" height="64"/>
+  <object name="5" type="LavaDoor" x="544" y="640" width="64" height="32"/>
+  <object name="9" type="LavaDoor" x="992" y="896" width="32" height="96"/>
+  <object name="14" type="LavaDoor" x="512" y="448" width="32" height="64"/>
+  <object name="15" type="LavaDoor" x="96" y="256" width="32" height="64"/>
+  <object name="17" type="LavaDoor" x="160" y="32" width="32" height="64"/>
+  <object name="7" type="LavaDoor" x="672" y="1600" width="32" height="192"/>
+  <object name="10" type="LavaDoor" x="800" y="1696" width="32" height="96"/>
+  <object name="10" type="LavaDoor" x="960" y="1472" width="64" height="32"/>
+ </objectgroup>
+</map>

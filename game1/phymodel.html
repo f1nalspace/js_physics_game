@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Physics</title>
+<script type="text/javascript">
+// ---------------------------------------------------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------------------------------------------------
+window.requestAnimFrame = (function () {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+})();
+
+Function.prototype.inheritsFrom = function (parentClassOrObject) {
+    if (parentClassOrObject.constructor == Function) {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//Vector2
+//---------------------------------------------------------------------------------------------------------------------
+function Vector2(x, y) {
+    return {
+        x:x.x !== undefined && y === undefined ? x.x : x,
+        y:x.y !== undefined && y === undefined ? x.y : y,
+        halfX:function () {
+            return this.x / 2;
+        },
+        halfY:function () {
+            return this.y / 2;
+        },
+        dot:function (v) {
+            return (this.x * v.x) + (this.y * v.y);
+        },
+        sub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x - x.x, this.y - x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x - x, this.y - y);
+            } else {
+                return Vector2(this.x - x, this.y - x);
+            }
+        },
+        isub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x -= x.x;
+                this.y -= x.y;
+            } else if (y !== undefined) {
+                this.x -= x;
+                this.y -= y;
+            } else {
+                this.x -= x;
+                this.y -= x;
+            }
+        },
+        add:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x + x.x, this.y + x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x + x, this.y + y);
+            } else {
+                return Vector2(this.x + x, this.y + x);
+            }
+        },
+        iadd:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x += x.x;
+                this.y += x.y;
+            } else if (y !== undefined) {
+                this.x += x;
+                this.y += y;
+            } else {
+                this.x += x;
+                this.y += x;
+            }
+        },
+        mul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x * x.x, this.y * x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x * x, this.y * y);
+            } else {
+                return Vector2(this.x * x, this.y * x);
+            }
+        },
+        imul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x *= x.x;
+                this.y *= x.y;
+            } else if (y !== undefined) {
+                this.x *= x;
+                this.y *= y;
+            } else {
+                this.x *= x;
+                this.y *= x;
+            }
+        },
+        div:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x / x.x, this.y / x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x / x, this.y / y);
+            } else {
+                return Vector2(this.x / x, this.y / x);
+            }
+        },
+        idiv:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x /= x.x;
+                this.y /= x.y;
+            } else if (y !== undefined) {
+                this.x /= x;
+                this.y /= y;
+            } else {
+                this.x /= x;
+                this.y /= x;
+            }
+        },
+        lengthSqrt:function () {
+            return this.dot(this);
+        },
+        length:function () {
+            return Math.sqrt(this.lengthSqrt());
+        },
+        normalized:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            return Vector2(this.x / l, this.y / l);
+        },
+        normalize:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            this.x /= l;
+            this.y /= l;
+            return l;
+        },
+        perpRight:function () {
+            return Vector2(-this.y, this.x);
+        },
+        perpLeft:function () {
+            return Vector2(this.y, -this.x);
+        },
+        setup:function (x, y) {
+            if (x.x !== undefined && y === undefined) {
+                this.x = x.x;
+                this.y = x.y;
+            } else if (y !== undefined) {
+                this.x = x;
+                this.y = y;
+            } else {
+                this.x = x;
+                this.y = x;
+            }
+        },
+        clone:function () {
+            return Vector2(this.x, this.y);
+        },
+        toString:function () {
+            return this.x + ", " + this.y;
+        },
+        zero:function () {
+            this.x = 0;
+            this.y = 0;
+        }
+    };
+}
+
+function Line(a, b, n) {
+    this.a = a;
+    this.b = b;
+    this.n = n;
+}
+
+function Plane(normal, distance, length, color) {
+    var n = distance === undefined ? normal.normalized() : normal;
+    var w = distance || normal.length();
+    return {
+        n:n,
+        w:w,
+        l:length,
+        c:color,
+        point:function () {
+            return this.n.mul(this.w);
+        }
+    }
+}
+
+function findClosestPointOnLine(pos, lineA, lineB, lineNormal) {
+    // Get distance vector between position and line start
+    var pointLineStartDistance = pos.sub(lineA);
+
+    // Project distance vector on line normal
+    var proj = pointLineStartDistance.dot(lineNormal);
+
+    // Get projection vector
+    var proj_v = lineNormal.mul(proj);
+
+    // Simply add the the projection vector the line start and we have our closest point on line
+    var closest = proj_v.add(lineA);
+
+    return closest;
+}
+
+function findClosestPointOnPlane(plane, pos) {
+    var normal = plane.n;
+    var tangent = normal.perpRight();
+    var point = plane.point();
+    var distanceToPlane = pos.sub(point);
+    var distance = tangent.dot(distanceToPlane);
+    var closest = point.add(tangent.mul(distance));
+    return closest;
+}
+
+function reflectVector(v, normal, bounciness, friction) {
+    // Project velocity on line normal
+    var projVelocity = v.dot(normal);
+    // Impact velocity vector
+    var impactVel = normal.mul(projVelocity);
+    // Tangent velocity vector (across the surface of collision)
+    var tangentVel = v.sub(impactVel);
+    // Velocity for bounciness
+    var velBounciness = Vector2(-impactVel.x * bounciness, -impactVel.y * bounciness);
+    // Velocity for friction
+    var velFriction = Vector2(tangentVel.x * (1.0 - friction), tangentVel.y * (1.0 - friction));
+    // Resulting velocity
+    return velBounciness.add(velFriction);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sample
+// ---------------------------------------------------------------------------------------------------------------------
+var Keys = {
+    Left:37,
+    Right:39,
+    Up:38,
+    Down:40
+}
+
+function Sample() {
+    this.canvas = document.getElementById("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.keystate = [];
+
+    this.mouse = Vector2(-1, -1);
+    this.mousestate = [];
+
+    this.collisionPlane = new Plane(Vector2(0, 1), 50, 600);
+    this.ball = {
+        prevPos:Vector2(-200, -100), // Previous position, or "Current position"
+        pos:Vector2(-200, -100), // Current position or "Next position",
+        radius:30
+    };
+    var displacement = this.ball.pos.add(100, 100);
+    this.ball.pos.setup(this.ball.prevPos.add(displacement.sub(this.ball.prevPos)));
+
+    this.bounciness = 1.0;
+    this.friction = 0.0;
+
+    this.font = "normal 14px verdana";
+
+    var that = this;
+
+    var getXandY = function (e) {
+        var x = e.clientX - that.canvas.getBoundingClientRect().left;
+        var y = e.clientY - that.canvas.getBoundingClientRect().top;
+        return Vector2(x - (that.canvas.width / 2), y - (that.canvas.height / 2));
+    };
+
+    this.canvas.addEventListener('contextmenu', function(evt) {
+        evt.preventDefault();
+    }, false);
+
+    this.canvas.addEventListener("keydown", function (ev) {
+        that.keystate[ev.keyCode] = true;
+    }, false);
+    this.canvas.addEventListener("keyup", function (ev) {
+        that.keystate[ev.keyCode] = false;
+    }, false);
+    this.canvas.addEventListener("mousedown", function (ev) {
+        that.mouse = getXandY(ev);
+        that.mousestate[ev.button] = true;
+    }, false);
+    this.canvas.addEventListener("mouseup", function (ev) {
+        that.mousestate[ev.button] = false;
+    }, false);
+    this.canvas.addEventListener("mousemove", function (ev) {
+        that.mouse = getXandY(ev);
+    }, false);
+}
+
+Sample.prototype.isKeyDown = function (key) {
+    return this.keystate[key] !== undefined && this.keystate[key] === true;
+}
+
+Sample.prototype.setKeyDown = function (key, value) {
+    this.keystate[key] = value;
+}
+
+Sample.prototype.isMouseDown = function (button) {
+    return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+}
+
+Sample.prototype.init = function () {
+};
+
+Sample.prototype.update = function (dt) {
+    if (this.isKeyDown(Keys.Left)) {
+        this.friction += 0.25 * dt;
+    } else if (this.isKeyDown(Keys.Right)) {
+        this.friction += -0.25 * dt;
+    }
+
+    if (this.isKeyDown(Keys.Up)) {
+        this.bounciness += 0.25 * dt;
+    } else if (this.isKeyDown(Keys.Down)) {
+        this.bounciness += -0.25 * dt;
+    }
+    this.bounciness = Math.max(Math.min(this.bounciness, 1.0), 0.0);
+    this.friction = Math.max(Math.min(this.friction, 1.0), 0.0);
+
+    // This is the simulation of the integration (vel += acc * dt, pos += vel * dt)
+    if (this.isMouseDown(0)) {
+        if (this.ball.displacement === null) {
+            this.ball.displacement = Vector2(0, 0);
+        }
+        var displacement = this.mouse.clone();
+        this.ball.pos.setup(this.ball.prevPos.add(displacement.sub(this.ball.prevPos)));
+    }
+
+    // This is the simulation of the integration (vel += acc * dt, pos += vel * dt)
+    if (this.isMouseDown(2)) {
+        this.ball.prevPos.setup(this.mouse);
+    }
+};
+
+Sample.prototype.renderRectangle = function (rect, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+};
+
+Sample.prototype.renderLine = function (x1, y1, x2, y2, color, lineWidth) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderText = function (x, y, text, color, baseline, align) {
+    this.ctx.fillStyle = color;
+    this.ctx.font = this.font;
+
+    this.ctx.textBaseline = baseline || "middle";
+    this.ctx.textAlign = align || "center";
+
+    this.ctx.fillText(text, x, y);
+};
+
+Sample.prototype.renderCircle = function (x, y, radius, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+    this.ctx.fill();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderArrow = function (p1, p2, color, lineWidth) {
+    var v = p1.sub(p2);
+    var n = v.normalized();
+    var t = n.perpRight();
+    var p = n.perpLeft();
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, lineWidth);
+
+    var size = 20;
+
+    var ts = n.mul(0.9).add(t).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts.x, p2.y + ts.y, color, lineWidth);
+
+    var ts2 = n.mul(0.9).add(p).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts2.x, p2.y + ts2.y, color, lineWidth);
+};
+
+Sample.prototype.render = function () {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw black background
+    this.ctx.fillStyle = "black";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save translation and move to center on the canvas
+    this.ctx.save();
+    this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+
+    // Draw ball
+    this.renderCircle(this.ball.prevPos.x, this.ball.prevPos.y, this.ball.radius, "yellow");
+    this.renderText(this.ball.prevPos.x - 50, this.ball.prevPos.y, "p1", "yellow");
+
+    // Draw ball displacement / velocity projection for next frame
+    this.ctx.globalAlpha = 0.75;
+    this.renderCircle(this.ball.pos.x, this.ball.pos.y, this.ball.radius, "red");
+    this.ctx.globalAlpha = 1.0;
+    this.renderText(this.ball.pos.x - 50, this.ball.pos.y, "p2", "red");
+
+    // Draw line from ball to displacement
+    this.renderArrow(this.ball.prevPos, this.ball.pos, "blue", 2);
+
+    // Save vars to faster access
+    var radius = this.ball.radius;
+    var curPos = this.ball.prevPos;
+    var nextPos = this.ball.pos;
+
+    var plane = this.collisionPlane;
+    var normal = plane.n;
+    var tangent = normal.perpRight();
+    var planePoint = plane.point();
+
+    this.renderText(planePoint.x, planePoint.y + 20, "Plane point", "lime", "middle", "center");
+    this.renderCircle(planePoint.x, planePoint.y, 10, "lime");
+
+    // Get distance between next and cur frame
+    var velocity = nextPos.sub(curPos); // Velocity
+
+    // Get direction normal
+    var directionNormal = velocity.normalized();
+
+    // Find closest point on line for current pos
+    var closest = findClosestPointOnPlane(plane, nextPos);
+    var closestDistance = closest.sub(curPos).dot(normal) - radius;
+    this.renderText(curPos.x + 50, curPos.y, "Distance to closest point on line: " + closestDistance, "white", "middle", "left");
+    this.renderText(curPos.x + 50, curPos.y + 20, "Time: 0.0", "white", "middle", "left");
+    var lineTarget = closest.add(normal.mul(-30));
+    this.renderArrow(closest, lineTarget, "yellow", 2);
+    this.renderText(closest.x, closest.y + 12, "Closest point on line", "yellow");
+
+    // Project velocity on direction normal
+    var projVel = velocity.dot(normal);
+    this.renderText(nextPos.x + 50, nextPos.y, "Projected velocity on line normal: " + projVel, "white", "middle", "left");
+    this.renderText(nextPos.x + 50, nextPos.y + 20, "Time: 1.0", "white", "middle", "left");
+
+    if (projVel > closestDistance) {
+        // Time = Cur distance / projected velocity
+        var time = closestDistance / projVel;
+
+        // Correct velocity by multiplying it by penetration factor
+        var correctedVelocity = velocity.sub(velocity.mul(1.0 - time));
+
+        // Now we can calculate the corrected position
+        var correctionPosition = curPos.add(correctedVelocity);
+
+        // Render collision infos
+        this.renderText(correctionPosition.x + 50, correctionPosition.y, "Predicted collision between this and next frame", "white", "middle", "left");
+        this.renderText(correctionPosition.x + 50, correctionPosition.y + 20, "Time: " + time, "white", "middle", "left");
+
+        // Render corrected positioned ball
+        this.ctx.globalAlpha = 0.75;
+        this.renderCircle(correctionPosition.x, correctionPosition.y, radius, "green");
+        this.ctx.globalAlpha = 1.0;
+        this.renderText(correctionPosition.x - 50, correctionPosition.y, "p3", "green");
+
+        // Reflect velocity
+        var reflectedVelocity = reflectVector(velocity, normal, this.bounciness, this.friction);
+
+        // Render line after reflected velocity is applied on corrected position
+        var targetReflectedVelocityPosition = correctionPosition.add(reflectedVelocity);
+        this.renderArrow(correctionPosition, targetReflectedVelocityPosition, "purple", 3);
+        this.renderText(targetReflectedVelocityPosition.x + 20, targetReflectedVelocityPosition.y, "p4", "purple");
+
+        // Find closest point on line for half reflected pos
+        var closestReflected = findClosestPointOnPlane(plane, targetReflectedVelocityPosition);
+        this.renderLine(targetReflectedVelocityPosition.x, targetReflectedVelocityPosition.y, closestReflected.x, closestReflected.y, "red", "1");
+
+        // Render reflection infos
+        var halfReflectedPosition = correctionPosition.add(reflectedVelocity.mul(0.5));
+        this.renderText(halfReflectedPosition.x + 50, halfReflectedPosition.y, "Bounciness: " + this.bounciness + (this.bounciness == 1.0 ? " (No energy lost)" : ""), "white", "middle", "left");
+        this.renderText(halfReflectedPosition.x + 50, halfReflectedPosition.y + 20, "Friction: " + this.friction, "white", "middle", "left");
+
+        // Get contact point
+        var contactPoint =  correctionPosition.add(normal.mul(radius));
+        this.renderCircle(contactPoint.x, contactPoint.y, 5, "red");
+        this.renderText(contactPoint.x, contactPoint.y + 20, "Contact point", "red", "middle", "center");
+    } else {
+        // Normal collision detection
+    }
+
+    // Draw line
+    var planeNormal = plane.n;
+    var planeTangent = planeNormal.perpRight();
+    var planePos = plane.point();
+    var planePosStart = planePos.add(planeTangent.mul(plane.l * 0.5));
+    var planePosEnd = planePosStart.add(planeTangent.mul(-1).mul(plane.l));
+    this.renderLine(planePosStart.x, planePosStart.y, planePosEnd.x, planePosEnd.y, "white", 2.0);
+
+    // Restore translation
+    this.ctx.restore();
+};
+
+Sample.prototype.run = function () {
+    this.init();
+    var that = this;
+    var dt = 1.0 / 60;
+    var step = dt;
+    var time = 0;
+    (function gameLoop() {
+        requestAnimFrame(gameLoop);
+        time += dt;
+        while (dt && time >= step) {
+            that.update(dt);
+            time -= step;
+        }
+        that.render();
+    })();
+};
+</script>
+</head>
+<body>
+<canvas tabindex="1" id="canvas" width="800" height="480"></canvas>
+<script type="text/javascript">
+    var sample = new Sample();
+    sample.run();
+</script>
+</body>
+</html>

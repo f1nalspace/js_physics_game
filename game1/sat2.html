@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SAT 2 (Time)</title>
+<script type="text/javascript">
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------------------------------------------------
+window.requestAnimFrame = (function () {
+    return  window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+})();
+
+Function.prototype.inheritsFrom = function (parentClassOrObject) {
+    if (parentClassOrObject.constructor == Function) {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+function floorFigure(figure, decimals) {
+    if (!decimals) decimals = 2;
+    var d = Math.pow(10, decimals);
+    return (parseInt(figure * d) / d).toFixed(decimals);
+}
+;
+
+//---------------------------------------------------------------------------------------------------------------------
+//Vector2
+//---------------------------------------------------------------------------------------------------------------------
+function Vector2(x, y) {
+    return {
+        x:x.x !== undefined && y === undefined ? x.x : x,
+        y:x.y !== undefined && y === undefined ? x.y : y,
+        halfX:function () {
+            return this.x / 2;
+        },
+        halfY:function () {
+            return this.y / 2;
+        },
+        dot:function (v) {
+            return (this.x * v.x) + (this.y * v.y);
+        },
+        sub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x - x.x, this.y - x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x - x, this.y - y);
+            } else {
+                return Vector2(this.x - x, this.y - x);
+            }
+        },
+        isub:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x -= x.x;
+                this.y -= x.y;
+            } else if (y !== undefined) {
+                this.x -= x;
+                this.y -= y;
+            } else {
+                this.x -= x;
+                this.y -= x;
+            }
+        },
+        add:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x + x.x, this.y + x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x + x, this.y + y);
+            } else {
+                return Vector2(this.x + x, this.y + x);
+            }
+        },
+        iadd:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x += x.x;
+                this.y += x.y;
+            } else if (y !== undefined) {
+                this.x += x;
+                this.y += y;
+            } else {
+                this.x += x;
+                this.y += x;
+            }
+        },
+        mul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x * x.x, this.y * x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x * x, this.y * y);
+            } else {
+                return Vector2(this.x * x, this.y * x);
+            }
+        },
+        imul:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x *= x.x;
+                this.y *= x.y;
+            } else if (y !== undefined) {
+                this.x *= x;
+                this.y *= y;
+            } else {
+                this.x *= x;
+                this.y *= x;
+            }
+        },
+        div:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                return Vector2(this.x / x.x, this.y / x.y);
+            } else if (y !== undefined) {
+                return Vector2(this.x / x, this.y / y);
+            } else {
+                return Vector2(this.x / x, this.y / x);
+            }
+        },
+        idiv:function (x, y) {
+            if (x.x !== undefined && x.y !== undefined) {
+                this.x /= x.x;
+                this.y /= x.y;
+            } else if (y !== undefined) {
+                this.x /= x;
+                this.y /= y;
+            } else {
+                this.x /= x;
+                this.y /= x;
+            }
+        },
+        lengthSqrt:function () {
+            return this.dot(this);
+        },
+        length:function () {
+            return Math.sqrt(this.lengthSqrt());
+        },
+        normalized:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            return Vector2(this.x / l, this.y / l);
+        },
+        normalize:function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            this.x /= l;
+            this.y /= l;
+            return l;
+        },
+        perpRight:function () {
+            return Vector2(-this.y, this.x);
+        },
+        perpLeft:function () {
+            return Vector2(this.y, -this.x);
+        },
+        setup:function (x, y) {
+            if (x.x !== undefined && y === undefined) {
+                this.x = x.x;
+                this.y = x.y;
+            } else if (y !== undefined) {
+                this.x = x;
+                this.y = y;
+            } else {
+                this.x = x;
+                this.y = x;
+            }
+        },
+        clone:function () {
+            return Vector2(this.x, this.y);
+        },
+        toString:function () {
+            return this.x + ", " + this.y;
+        },
+        zero:function () {
+            this.x = 0;
+            this.y = 0;
+        }
+    };
+}
+
+function Rectangle(x, y, w, h) {
+    return {
+        x:x,
+        y:y,
+        w:w,
+        h:h,
+        offset:function (x, y) {
+            this.x += x;
+            this.y += y;
+        },
+        left:function () {
+            return this.x;
+        },
+        right:function () {
+            return this.x + this.w;
+        },
+        top:function () {
+            return this.y;
+        },
+        bottom:function () {
+            return this.y + this.h;
+        },
+        intersectsWith:function (other) {
+            return (this.right() >= other.left() &&
+                    this.bottom() >= other.top()) && (this.left() <= other.right() && this.top() <= other.bottom());
+        }
+    };
+}
+
+function rectFromLTRB(l, t, r, b) {
+    return Rectangle(l, t, r - l, b - t);
+}
+
+function Body(pos) {
+    this.pos = pos;
+    this.vel = Vector2(0, 0);
+}
+Body.prototype.getAxis = function () {
+    throw new Error("Virtual function");
+};
+Body.prototype.getSize = function () {
+    throw new Error("Virtual function");
+};
+Body.prototype.project = function (axis) {
+    throw new Error("Virtual function");
+};
+Body.prototype.boundRect = function (offset) {
+    var p = this.pos.add(offset || Vector2(0, 0));
+    var s = this.getSize();
+    return Rectangle(p.x - s.halfX(), p.y - s.halfY(), s.x, s.y);
+};
+Body.prototype.velocityRect = function () {
+    var a = this.boundRect();
+    var b = this.boundRect(this.vel);
+
+    var l = Math.min(a.left(), b.left());
+    var t = Math.min(a.top(), b.top());
+    var r = Math.max(a.right(), b.right());
+    var b = Math.max(a.bottom(), b.bottom());
+
+    return Rectangle(l, t, r - l, b - t);
+};
+
+function OBB(pos, size) {
+    Body.call(this, pos);
+    this.axis = [Vector2(1.0, 0.0), Vector2(0.0, 1.0)];
+    this.size = size;
+}
+OBB.inheritsFrom(Body);
+
+OBB.prototype.getAxis = function () {
+    return this.axis;
+};
+OBB.prototype.getSize = function () {
+    return this.size;
+};
+
+OBB.prototype.project = function (axis) {
+    var scale = Math.abs(axis.dot(this.axis[0])) * this.size.halfX() + Math.abs(axis.dot(this.axis[1])) * this.size.halfY();
+    return {
+        min:-scale,
+        max:+scale,
+        toString:function () {
+            return this.min + " - " + this.max;
+        }
+    };
+};
+
+OBB.prototype.getClosestPoint = function (point) {
+    var a = ["x", "y"];
+    var output = Vector2(0, 0);
+    for (var i = 0; i < 2; i++) {
+        var c = a[i];
+        var v = point[c];
+        v = Math.max(v, this.pos[c] - this.size[c] * 0.5);
+        v = Math.min(v, this.pos[c] + this.size[c] * 0.5);
+        output[c] = v;
+    }
+    return output;
+};
+
+function Circle(pos, radius) {
+    Body.call(this, pos);
+    this.radius = radius;
+}
+Circle.inheritsFrom(Body);
+
+Circle.prototype.getAxis = function () {
+    return [];
+};
+Circle.prototype.getSize = function () {
+    return Vector2(this.radius * 2, this.radius * 2);
+};
+
+Circle.prototype.project = function (axis) {
+    return {
+        min:-this.radius,
+        max:+this.radius,
+        toString:function () {
+            return this.min + " - " + this.max;
+        }
+    };
+};
+
+Circle.prototype.getClosestPoint = function (point) {
+    return null;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sample
+// ---------------------------------------------------------------------------------------------------------------------
+var Keys = {
+    Space: 32,
+    Left:37,
+    Right:39,
+    Up:38,
+    Down:40
+}
+
+function Sample() {
+    this.canvas = document.getElementById("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.keystate = [];
+
+    this.mouse = Vector2(-1, -1);
+    this.mousestate = [];
+
+    //this.bodyA = new OBB(Vector2(-150, -125), Vector2(150, 150));
+    this.bodyAType = 1;
+    this.bodyA = new Circle(Vector2(-150, -125), 75);
+    this.bodyB = new OBB(Vector2(150, 125), Vector2(150, 150));
+
+    this.font = "normal 14px verdana";
+
+    var that = this;
+
+    var getXandY = function (e) {
+        var x = e.clientX - that.canvas.getBoundingClientRect().left;
+        var y = e.clientY - that.canvas.getBoundingClientRect().top;
+        return Vector2(x - (that.canvas.width / 2), y - (that.canvas.height / 2));
+    };
+
+    this.canvas.addEventListener('contextmenu', function (evt) {
+        evt.preventDefault();
+    }, false);
+
+    this.canvas.addEventListener("keydown", function (ev) {
+        that.keystate[ev.keyCode] = true;
+    }, false);
+    this.canvas.addEventListener("keyup", function (ev) {
+        that.keystate[ev.keyCode] = false;
+    }, false);
+    this.canvas.addEventListener("mousedown", function (ev) {
+        that.mouse = getXandY(ev);
+        that.mousestate[ev.button] = true;
+    }, false);
+    this.canvas.addEventListener("mouseup", function (ev) {
+        that.mousestate[ev.button] = false;
+    }, false);
+    this.canvas.addEventListener("mousemove", function (ev) {
+        that.mouse = getXandY(ev);
+    }, false);
+}
+
+Sample.prototype.isKeyDown = function (key) {
+    return this.keystate[key] !== undefined && this.keystate[key] === true;
+}
+
+Sample.prototype.setKeyDown = function (key, value) {
+    this.keystate[key] = value;
+}
+
+Sample.prototype.isMouseDown = function (button) {
+    return this.mousestate[button] !== undefined && this.mousestate[button] === true;
+}
+
+Sample.prototype.init = function () {
+};
+
+Sample.prototype.update = function (dt) {
+    var speed = 150;
+
+    if (this.isKeyDown(Keys.Space)) {
+        this.bodyAType++;
+        if (this.bodyAType > 1) {
+            this.bodyAType = 0;
+        }
+        var oldPos = this.bodyA.pos.clone();
+        var oldVel = this.bodyA.vel.clone();
+        if (this.bodyAType == 0) {
+            this.bodyA = new OBB(oldPos, Vector2(150, 150));
+        } else if (this.bodyAType == 1) {
+            this.bodyA = new Circle(oldPos, 75);
+        }
+        this.bodyA.vel.setup(oldVel);
+        this.setKeyDown(Keys.Space, false);
+    }
+
+    if (this.isKeyDown(Keys.Left)) {
+        this.bodyA.pos.iadd(Vector2(-speed * dt, 0));
+    } else if (this.isKeyDown(Keys.Right)) {
+        this.bodyA.pos.iadd(Vector2(speed * dt, 0));
+    }
+
+    if (this.isKeyDown(Keys.Up)) {
+        this.bodyA.pos.iadd(Vector2(0, -speed * dt));
+    } else if (this.isKeyDown(Keys.Down)) {
+        this.bodyA.pos.iadd(Vector2(0, speed * dt));
+    }
+
+    // This is the simulation of the integration (vel += acc * dt, pos += vel * dt)
+    if (this.isMouseDown(0)) {
+        var displacement = this.mouse.clone();
+        //this.bodyA.vel.setup(displacement.sub(this.bodyA.pos));
+    } else if (this.isMouseDown(2)) {
+        //var displacement = this.mouse.clone();
+        //this.bodyB.vel.setup(displacement.sub(this.bodyB.pos));
+    }
+};
+
+Sample.prototype.renderRectangle = function (rect, color) {
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+    this.renderText(rect.x - 10, rect.y - 10, floorFigure(rect.x, 3) + ", " + floorFigure(rect.y, 3))
+    this.renderText(rect.right() + 10, rect.y - 10, floorFigure(rect.right(), 3) + ", " + floorFigure(rect.y, 3))
+    this.renderText(rect.right() + 10, rect.bottom() + 10, floorFigure(rect.right(), 3) + ", " + floorFigure(rect.bottom(), 3))
+    this.renderText(rect.x - 10, rect.bottom() + 10, floorFigure(rect.x, 3) + ", " + floorFigure(rect.bottom(), 3))
+};
+
+Sample.prototype.renderLine = function (x1, y1, x2, y2, color, lineWidth) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderText = function (x, y, text, color, baseline, align) {
+    this.ctx.fillStyle = color;
+    this.ctx.font = this.font;
+
+    this.ctx.textBaseline = baseline || "middle";
+    this.ctx.textAlign = align || "center";
+
+    this.ctx.fillText(text, x, y);
+};
+
+Sample.prototype.renderCircle = function (x, y, radius, color, strokeColor, lineWidth) {
+    this.ctx.fillStyle = color;
+    this.ctx.lineWidth = lineWidth || 1;
+    if (strokeColor !== undefined) {
+        this.ctx.strokeStyle = strokeColor;
+    }
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+    this.ctx.fill();
+    if (strokeColor !== undefined) {
+        this.ctx.stroke();
+    }
+    this.ctx.closePath();
+};
+
+Sample.prototype.renderArrow = function (p1, p2, color, lineWidth) {
+    var v = p1.sub(p2);
+    var n = v.normalized();
+    var t = n.perpRight();
+    var p = n.perpLeft();
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, color, lineWidth);
+
+    var size = 20;
+
+    var ts = n.mul(0.9).add(t).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts.x, p2.y + ts.y, color, lineWidth);
+
+    var ts2 = n.mul(0.9).add(p).mul(0.5).mul(size);
+    this.renderLine(p2.x, p2.y, p2.x + ts2.x, p2.y + ts2.y, color, lineWidth);
+};
+
+Sample.prototype.renderBoxProjection = function (proj, projOffset, screenSize, screenOffset, box, n, t, color) {
+    var lineCenter = t.mul(screenSize.add(screenOffset).mul(0.5));
+    var lineStart = lineCenter.add(n.mul(proj.min + projOffset));
+    var lineEnd = lineCenter.add(n.mul(proj.max + projOffset));
+    this.renderLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, color, 2);
+
+    //this.renderText(lineStart.x - (t.x * 24), lineStart.y - (t.y * 24), (proj.min + projOffset), "white");
+    //this.renderText(lineEnd.x - (t.x * 24), lineEnd.y - (t.y * 24), (proj.max + projOffset), "white");
+};
+
+Sample.prototype.renderBoxLines = function (pos, size, vel) {
+    var p1 = pos.add(Vector2(size.halfX(), size.halfY()));
+    var p2 = pos.add(vel).sub(Vector2(-size.halfX(), -size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, "white", 1);
+    p1 = pos.add(Vector2(size.halfX(), -size.halfY()));
+    p2 = pos.add(vel).sub(Vector2(-size.halfX(), size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, "white", 1);
+    var p1 = pos.add(Vector2(-size.halfX(), size.halfY()));
+    var p2 = pos.add(vel).sub(Vector2(size.halfX(), -size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, "white", 1);
+    p1 = pos.add(Vector2(-size.halfX(), -size.halfY()));
+    p2 = pos.add(vel).sub(Vector2(size.halfX(), size.halfY()));
+    this.renderLine(p1.x, p1.y, p2.x, p2.y, "white", 1);
+};
+
+Sample.prototype.render = function () {
+    var screenSize = Vector2(this.canvas.width, this.canvas.height);
+    var screenRect = Rectangle(-screenSize.halfX(), -screenSize.halfY(), screenSize.x, screenSize.y);
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw black background
+    this.ctx.fillStyle = "black";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save translation and move to center on the canvas
+    this.ctx.save();
+    this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+
+    var bodyA = this.bodyA;
+    var posA = bodyA.pos;
+    var velA = bodyA.vel;
+    var normalA = velA.normalized().perpRight();
+    var targetA = posA.add(velA);
+    var sizeA = bodyA.size;
+
+    var bodyB = this.bodyB;
+    var posB = bodyB.pos;
+    var velB = bodyB.vel;
+    var sizeB = bodyB.size;
+
+    var velRectA = bodyA.velocityRect();
+    var velRectB = bodyB.velocityRect();
+
+    // Draw body A
+    if (bodyA instanceof OBB) {
+        var rectA = bodyA.boundRect();
+        this.renderRectangle(rectA, "blue");
+
+        // Draw displacement
+        rectA = bodyA.boundRect(velA);
+        this.ctx.globalAlpha = 0.5;
+        this.renderRectangle(rectA, "blue");
+        this.ctx.globalAlpha = 1.0;
+
+        // Render displacement lines
+        this.ctx.globalAlpha = 0.25;
+        this.renderBoxLines(posA, sizeA, velA);
+        this.ctx.globalAlpha = 1.0;
+
+        // Draw velocity rect
+        this.ctx.globalAlpha = 0.1;
+        this.renderRectangle(velRectA, "blue");
+        this.ctx.globalAlpha = 1.0;
+    } else if (bodyA instanceof Circle) {
+        this.renderCircle(bodyA.pos.x, bodyA.pos.y, bodyA.radius, "blue");
+
+        // Draw displacement
+        this.ctx.globalAlpha = 0.5;
+        this.renderCircle(bodyA.pos.x + velA.x, bodyA.pos.y + velA.y, bodyA.radius, "blue");
+        this.ctx.globalAlpha = 1.0;
+
+        // Render displacement lines
+        this.ctx.globalAlpha = 0.25;
+        this.renderLine(posA.x + normalA.x * bodyA.radius, posA.y + normalA.y * bodyA.radius, targetA.x + normalA.x * bodyA.radius, targetA.y + (normalA.y * bodyA.radius), "white");
+        this.renderLine(posA.x - normalA.x * bodyA.radius, posA.y - normalA.y * bodyA.radius, targetA.x - normalA.x * bodyA.radius, targetA.y - (normalA.y * bodyA.radius), "white");
+        this.ctx.globalAlpha = 1.0;
+
+        // Draw velocity rect
+        this.ctx.globalAlpha = 0.1;
+        this.renderRectangle(velRectA, "blue");
+        this.ctx.globalAlpha = 1.0;
+    }
+
+    // Draw body B
+    if (bodyB instanceof OBB) {
+        var rectB = bodyB.boundRect();
+        this.renderRectangle(rectB, "red");
+
+        // Draw displacement
+        rectB = bodyB.boundRect(velB);
+        this.ctx.globalAlpha = 0.25;
+        this.renderRectangle(rectB, "red");
+        this.ctx.globalAlpha = 1.0;
+
+        // Draw velocity rect
+        this.ctx.globalAlpha = 0.1;
+        this.renderRectangle(velRectB, "red");
+        this.ctx.globalAlpha = 1.0;
+    }
+
+    var sweptSat = false;
+
+    var smallestAxis = null;
+    var smallestDistance = 0;
+
+    // Do we have a velocity rect overlap (Resides Body B in the TOI-Island of A?)
+    if (velRectA.intersectsWith(velRectB)) {
+        var relativeDistance = posB.sub(posA);
+        var relativeVelocity = velB.sub(velA);
+
+        var noCollision = false;
+        var timeNormal = null;
+        var timeOfImpact = null;
+
+        // Draw axis lines
+        var screenWithOffset = screenSize.add(Vector2(-20, -20)).mul(0.5);
+        var axis = [Vector2(1.0, 0.0), Vector2(0.0, 1.0)];
+
+        if (bodyA instanceof Circle && bodyB instanceof OBB) {
+            var closestPoint = bodyB.getClosestPoint(posA);
+            var closestDistance = closestPoint.sub(posA);
+            if (closestDistance.lengthSqrt() != 0) {
+                axis.push(closestDistance.normalized());
+                this.renderLine(closestPoint.x, closestPoint.y, posA.x, posA.y, "yellow");
+                this.renderText(-50, 0, closestPoint.dot(posA), "lime");
+            }
+        }
+
+        for (var i in axis) {
+            var n = axis[i];
+
+            var t = n.perpRight();
+            var lineCenter = t.mul(screenWithOffset);
+            var lineStart = lineCenter.sub(n.mul(screenWithOffset));
+            var lineEnd = lineCenter.add(n.mul(screenWithOffset));
+            this.renderLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, "white", 1);
+
+            var textPos = lineCenter.add(t.mul(-80));
+
+            var projA = bodyA.project(n);
+            var projB = bodyB.project(n);
+
+            // Project boxes velocity on axis
+            this.renderBoxProjection(projA, posA.add(velA).dot(n), screenSize, Vector2(-40, -40), bodyA, n, t, "blue");
+            this.renderBoxProjection(projB, posB.add(velB).dot(n), screenSize, Vector2(-60, -60), bodyB, n, t, "red");
+
+            var p = relativeDistance.dot(n);
+            projA.min += p;
+            projA.max += p;
+
+            // Get distances between the projections
+            var E = projA.min - projB.max;
+            var L = projB.min - projA.max;
+            var overlap = E > L ? E : L;
+            if (overlap > smallestDistance || smallestAxis == null) {
+                smallestDistance = overlap;
+                smallestAxis = n.clone();
+                if (smallestAxis.dot(relativeDistance) < 0) {
+                    smallestAxis = smallestAxis.mul(-1);
+                }
+            }
+
+            this.renderText(textPos.x, textPos.y - 32, "Axis: " + n.toString(), "yellow", "middle", "left");
+            this.renderText(textPos.x, textPos.y - 16, "Enter: " + E, "yellow", "middle", "left");
+            this.renderText(textPos.x, textPos.y, "Leave: " + L, "yellow", "middle", "left");
+            this.renderText(textPos.x, textPos.y + 64, "Overlap: " + overlap + " ("+smallestAxis.x + "," + smallestAxis.y+")", "yellow", "middle", "left");
+
+            if (sweptSat) {
+                var v = relativeVelocity.dot(n);
+                if (Math.abs(v) > 0.0000001) {
+
+                    // Get time enter & leave by divide by distance
+                    var timeEnter = -E / v;
+                    var timeLeave = L / v;
+
+                    // Swap times if needed
+                    if (timeEnter > timeLeave) {
+                        var temp = timeEnter;
+                        timeEnter = timeLeave;
+                        timeLeave = temp;
+                    }
+
+                    // Render text
+                    this.renderText(textPos.x, textPos.y + 16, "Time enter: " + timeEnter, "yellow", "middle", "left");
+                    this.renderText(textPos.x, textPos.y + 32, "Time leave: " + timeLeave, "yellow", "middle", "left");
+
+                    // Time must be in range 0.0 to 1.0
+                    var tFirst = timeEnter < timeLeave ? timeEnter : timeLeave;
+
+                    if (!(tFirst < 0.0 || tFirst > 1.0)) {
+                        // Render time of impact
+                        this.renderText(textPos.x, textPos.y + 48, "Time of impact: " + tFirst, "lime", "middle", "left");
+
+                        // Save smallest time (Time of impact) when its greater (Positive smaller) than current one
+                        if (tFirst > timeOfImpact) {
+                            timeOfImpact = tFirst;
+                            timeNormal = n;
+                        }
+                    }
+                }
+            }
+        }
+
+        var massA = 100;
+        var invMassA = massA > 0 ? 1.0 / massA : 1;
+
+        var massB = 0;
+        var invMassB = massB > 0 ? 1.0 / massB : 1;
+
+        // Do we have a first time of impact and have a swept collision
+        if (timeOfImpact > 0 && !noCollision) {
+            // Correct velocity by first time of impact
+            var correctedVelA = velA.mul(timeOfImpact);
+            var correctedVelB = velB.mul(timeOfImpact);
+
+            // Correct position
+            var correctPosA = bodyA.pos.add(correctedVelA);
+            var correctPosB = bodyB.pos.add(correctedVelB);
+
+            // Draw new position
+            this.ctx.globalAlpha = 0.5;
+            if (bodyA instanceof OBB) {
+                var rectC = bodyA.boundRect(correctedVelA);
+                this.renderRectangle(rectC, "green");
+            } else if (bodyA instanceof Circle) {
+                this.renderCircle(bodyA.pos.x + correctedVelA.x, bodyA.pos.y + correctedVelA.y, bodyA.radius, "green");
+            }
+            this.ctx.globalAlpha = 1.0;
+            this.renderText(correctPosA.x, correctPosA.y, timeNormal.toString(), "yellow", "middle", "center");
+            this.renderText(correctPosA.x, correctPosA.y + 16, floorFigure(timeOfImpact, 4), "yellow", "middle", "center");
+
+            if (bodyB instanceof OBB) {
+                var rectD = bodyB.boundRect(correctedVelB);
+                this.renderRectangle(rectD, "purple");
+            }
+            this.renderText(correctPosB.x, correctPosB.y, timeNormal.toString(), "yellow", "middle", "center");
+            this.renderText(correctPosB.x, correctPosB.y + 16, floorFigure(timeOfImpact, 4), "yellow", "middle", "center");
+
+            //this.renderLine(posA.x, posA.y, posA.x + velA.x, posA.y + velA.y, "white", 1);
+        } else if (smallestAxis != null && !sweptSat) {
+            var correctedVelA = velA.sub(smallestAxis.mul(-smallestDistance));
+
+            this.ctx.globalAlpha = 0.5;
+            if (bodyA instanceof OBB) {
+                var rectC = bodyA.boundRect(correctedVelA);
+                this.renderRectangle(rectA, "blue");
+            } else if (bodyA instanceof Circle) {
+                this.renderCircle(bodyA.pos.x + correctedVelA.x, bodyA.pos.y + correctedVelA.y, bodyA.radius, "green");
+            }
+            this.ctx.globalAlpha = 1.0;
+        }
+
+        this.renderText(-canvas.width * 0.5 + 20, -canvas.height * 0.5 + 100, "Smallest distance: " + smallestDistance, "green", "left", "top");
+    }
+
+    // Restore translation
+    this.ctx.restore();
+
+    this.renderText(20, 20, "Hold 'Left' mouse button to move the velocity of the blue body", "yellow", "top", "left");
+    this.renderText(20, 40, "Hold 'Right' mouse button to move the velocity of the red body", "yellow", "top", "left");
+    this.renderText(20, 60, "Press space to switch blue body type", "yellow", "top", "left");
+};
+
+Sample.prototype.run = function () {
+    this.init();
+    var that = this;
+    var dt = 1.0 / 60;
+    (function gameLoop() {
+        requestAnimFrame(gameLoop);
+        that.update(dt);
+        that.render();
+    })();
+};
+</script>
+</head>
+<body>
+<canvas tabindex="1" id="canvas" width="800" height="600"></canvas>
+<script type="text/javascript">
+    var sample = new Sample();
+    sample.run();
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game 1</title>
+    <style>
+        html {
+            font-family: monospace, sans-serif;
+            font-size: 12pt;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            font-size: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: none;
+            outline: none;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+    </style>
+    
+    <!-- Standalone units -->
+    <script type="text/javascript" src="finalgine/reflection.js"></script>
+    <script type="text/javascript" src="finalgine/log.js"></script>
+    <script type="text/javascript" src="finalgine/utils.js"></script>
+    <script type="text/javascript" src="finalgine/vector.js"></script>
+    <script type="text/javascript" src="finalgine/geometry.js"></script>
+    <script type="text/javascript" src="finalgine/grid.js"></script>
+    <script type="text/javascript" src="finalgine/indexgrid.js"></script>
+    <script type="text/javascript" src="finalgine/math.js"></script>
+    <script type="text/javascript" src="finalgine/animation.js"></script>
+    <script type="text/javascript" src="finalgine/timer.js"></script>
+    <script type="text/javascript" src="finalgine/profiler.js"></script>
+
+	<!-- Entity / Level -->
+    <script type="text/javascript" src="finalgine/entity.js"></script>
+    <script type="text/javascript" src="finalgine/tilemap.js"></script>
+
+	<!-- Collision -->
+    <script type="text/javascript" src="finalgine/sat.js"></script>
+    <script type="text/javascript" src="finalgine/collision.js"></script>
+
+	<!-- Particles -->
+    <script type="text/javascript" src="finalgine/particles.js"></script>
+    <script type="text/javascript" src="finalgine/sph.js"></script>
+    
+    <!-- Camera -->
+    <script type="text/javascript" src="finalgine/camera.js"></script>
+    
+    <!-- UI -->
+    <script type="text/javascript" src="finalgine/ui.js"></script>
+
+	<!-- Core -->
+    <script type="text/javascript" src="finalgine/renderer.js"></script>
+    <script type="text/javascript" src="finalgine/asset_manager.js"></script>
+    <script type="text/javascript" src="finalgine/loadscreen.js"></script>
+    <script type="text/javascript" src="finalgine/gameengine.js"></script>
+    <script type="text/javascript" src="finalgine/game.js"></script>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+<script type="text/javascript" src="game1.js"></script>
+</body>
+</html>
