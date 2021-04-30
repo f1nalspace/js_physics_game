@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="../finaljs/core.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 50%;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+<script type="text/javascript">
+
+var vec2InstanceCount = 0;
+
+function Vec2(x, y) {
+    this.x = x || 0.0;
+    this.y = y || 0.0;
+    ++vec2InstanceCount;
+}
+
+Vec2.prototype.set = function (x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+Vec2.prototype.setFrom = function (v) {
+    this.x = v.x;
+    this.y = v.y;
+};
+
+Vec2.prototype.lengthSq = function () {
+    return this.x * this.x + this.y * this.y;
+};
+
+Vec2.prototype.normalize = function () {
+    var lenSq = this.lengthSq();
+    if (lenSq > PhysicsMath.EPSILON_SQ) {
+        var invLen = 1 / Math.sqrt(lenSq);
+        this.x *= invLen;
+        this.y *= invLen;
+    }
+};
+
+Vec2.prototype.init = function(){
+    this.x = 0;
+    this.y = 0;
+};
+
+Vec2.prototype.toString = function(){
+    return "(" + this.x + "," + this.y + ")";
+};
+
+function Pool(createFunc, applyFunc) {
+    var pool = [];
+    var capacity = 0;
+    var used = 0;
+    var ext = 0.2; // Extend pool bv 20 percent of the capacity
+    return {
+        /**
+         * Allocates objects by the given count - will increase capacity
+         * @param count {Number}
+         */
+        expand: function (count) {
+            var oldCapacity = capacity;
+            capacity += count;
+            for (var i = oldCapacity; i < capacity; i++) {
+                pool[i] = createFunc();
+            }
+        },
+        /**
+         * Grows the pool when capacity has reached max by 10 percent from the current capacity
+         * Returns a pooled object
+         * @returns {*}
+         */
+        get: function (x, y) {
+            // Expand pool if required
+            if (!(used < capacity)) {
+                this.expand(Math.max(Math.floor(capacity * ext), 1));
+            }
+            // Get pooled object
+            var v = pool[used++];
+            // Init object
+            if (typeof v['init'] == "function") {
+                v['init']();
+            }
+            // Apply properties
+            if (typeof applyFunc == "function") {
+                applyFunc(v, x, y);
+            }
+            return v;
+        },
+        /**
+         * Clears the pool
+         */
+        clear: function () {
+            used = 0;
+        },
+        item: function (index) {
+            if (used > 0 && index < used) {
+                return pool[index];
+            }
+            return null;
+        },
+        size: function () {
+            return used;
+        },
+        capacity: function () {
+            return capacity;
+        }
+    };
+}
+
+var Vec2Pool = new Pool(function () {
+    return new Vec2();
+});
+Vec2Pool.expand(10000);
+
+function Mat2() {
+    this.m00 = 0;
+    this.m01 = 0;
+    this.m10 = 0;
+    this.m11 = 0;
+}
+
+Mat2.prototype.set = function (radians) {
+    var c = Math.cos(radians);
+    var s = Math.sin(radians);
+    this.m00 = c;
+    this.m01 = -s;
+    this.m10 = s;
+    this.m11 = c;
+};
+
+Mat2.prototype.init = function(){
+    this.m00 = 0;
+    this.m01 = 0;
+    this.m10 = 0;
+    this.m11 = 0;
+};
+
+Mat2.prototype.toString = function(){
+    return "[" + this.m00 + ","  + this.m01 + "," + this.m10 + "," + this.m11 + "]";
+};
+
+var Mat2Pool = new Pool(function () {
+    return new Mat2();
+});
+Mat2Pool.expand(100);
+
+var PhysicsMath = {
+    PI: 3.14159265358979323846,
+    EPSILON: 0.0001,
+    EPSILON_SQ: 0.0001 * 0.0001,
+    DT: 1.0 / 60.0,
+    BIAS_RELATIVE: 0.95,
+    BIAS_ABSOLUTE: 0.01,
+    PENETRATION_ALLOWANCE: 0.05,
+    PENETRATION_CORRETION: 0.4,
+    GRAVITY: new Vec2(0, 50),
+    equal: function (a, b) {
+        return Math.abs(a - b) <= this.EPSILON;
+    },
+    clamp: function (min, max, a) {
+        return (a < min ? min : (a > max ? max : a));
+    },
+    gt: function (a, b) {
+        return a >= b * this.BIAS_RELATIVE + a * this.BIAS_ABSOLUTE;
+    },
+    random: function (min, max) {
+        return (max - min) * Math.random() + min;
+    }
+};
+
+function ArrayList() {
+    var items = [];
+    var count = 0;
+    return {
+        clear: function () {
+            for (var i = 0; i < items.length; i++) {
+                items[i] = null;
+            }
+            count = 0;
+        },
+        size: function () {
+            return count;
+        },
+        add: function (item) {
+            items[count++] = item;
+        },
+        get: function (index) {
+            return items[index];
+        }
+    };
+}
+
+var VecMath = {
+    arrayOf: function (count) {
+        var a = new Array(count);
+        for (var i = 0; i < count; i++) {
+            a[i] = new Vec2();
+        }
+        return a;
+    },
+    arrayOfPooled: function (count) {
+        var a = new Array(count);
+        for (var i = 0; i < count; i++) {
+            a[i] = Vec2Pool.get();
+        }
+        return a;
+    },
+    clone: function (out, v) {
+        out.x = v.x;
+        out.y = v.y;
+    },
+    dot: function (a, b) {
+        return a.x * b.x + a.y * b.y;
+    },
+    dotComponents: function (ax, ay, bx, by) {
+        return ax * bx + ay * by;
+    },
+    add: function (out, a, b) {
+        out.x = a.x + b.x;
+        out.y = a.y + b.y;
+        return out;
+    },
+    sub: function (out, a, b) {
+        out.x = a.x - b.x;
+        out.y = a.y - b.y;
+        return out;
+    },
+    neg: function (out, a) {
+        out.x = -a.x;
+        out.y = -a.y;
+        return out;
+    },
+    mulScalar: function (out, a, scalar) {
+        out.x = a.x * scalar;
+        out.y = a.y * scalar;
+        return out;
+    },
+    addMulScarlar: function (out, a, b, scalar) {
+        out.x = a.x + b.x * scalar;
+        out.y = a.y + b.y * scalar;
+        return out;
+    },
+    crossVA: function (out, v, a) {
+        out.x = v.y * a;
+        out.y = v.x * -a;
+        return out;
+    },
+    crossAV: function (out, a, v) {
+        out.x = v.y * -a;
+        out.y = v.x * a;
+        return out;
+    },
+    cross: function (a, b) {
+        return a.x * b.y - a.y * b.x;
+    },
+    distanceSq: function (a, b) {
+        var dx = a.x - b.x;
+        var dy = a.y - b.y;
+        return dx * dx + dy * dy;
+    }
+};
+
+var MatMath = {
+    transpose: function (out, m) {
+        out.m00 = m.m00;
+        out.m01 = m.m10;
+        out.m10 = m.m01;
+        out.m11 = m.m11;
+        return out;
+    },
+    mulComponents: function (out, m, x, y) {
+        out.x = m.m00 * x + m.m01 * y;
+        out.y = m.m10 * x + m.m11 * y;
+        return out;
+    },
+    mul: function (out, m, v) {
+        return this.mulComponents(out, m, v.x, v.y);
+    }
+};
+
+var ShapeType = {
+    Unknown: 0,
+    Circle: 1,
+    HalfSpace: 2,
+    Polygon: 3
+};
+
+function Shape(type) {
+    this.type = type;
+    this.body = null;
+    this.radius = 0;
+    this.transform = new Mat2();
+}
+
+Shape.prototype.computeMass = function (density) {
+    throw new Error("Abstract");
+};
+
+Shape.prototype.initialize = function () {
+    throw new Error("Abstract");
+};
+
+Shape.prototype.setOrient = function (radians) {
+    throw new Error("Abstract");
+};
+
+function CircleShape(r) {
+    Shape.call(this, ShapeType.Circle);
+    this.radius = r;
+}
+
+CircleShape.extend(Shape);
+
+CircleShape.prototype.computeMass = function (density) {
+    this.body.mass = PhysicsMath.PI * this.radius * this.radius * density;
+    this.body.invMass = (this.body.mass != 0.0) ? 1.0 / this.body.mass : 0.0;
+    this.body.inertia = this.body.mass * this.radius * this.radius;
+    this.body.invInertia = (this.body.inertia != 0.0) ? 1.0 / this.body.inertia : 0.0;
+};
+
+CircleShape.prototype.initialize = function () {
+    this.computeMass(1);
+};
+
+CircleShape.prototype.setOrient = function (radians) {
+};
+
+function HalfSpaceShape(normal, distance, visualLength) {
+    Shape.call(this, ShapeType.HalfSpace);
+    this.normal = normal;
+    this.distance = distance;
+    this.visualLength = visualLength;
+}
+
+HalfSpaceShape.extend(Shape);
+
+HalfSpaceShape.prototype.computeMass = function (density) {
+    this.body.mass = density;
+    this.body.invMass = (this.body.mass != 0.0) ? 1.0 / this.body.mass : 0.0;
+    this.body.inertia = this.mass;
+    this.body.invInertia = (this.body.inertia != 0.0) ? 1.0 / this.body.inertia : 0.0;
+};
+
+HalfSpaceShape.prototype.initialize = function () {
+    this.computeMass(1);
+};
+
+HalfSpaceShape.prototype.setOrient = function (radians) {
+};
+
+var MAX_POLY_VERTEX_COUNT = 64;
+
+function PolygonShape(verts) {
+    Shape.call(this, ShapeType.Polygon);
+    this.vertexCount = 0;
+    this.vertices = VecMath.arrayOf(MAX_POLY_VERTEX_COUNT);
+    this.normals = VecMath.arrayOf(MAX_POLY_VERTEX_COUNT);
+    if (typeof verts != "undefined" && verts != null && verts.length > 0) {
+        this.set(verts);
+    }
+}
+
+PolygonShape.extend(Shape);
+
+PolygonShape.prototype.set = function (verts) {
+    var i;
+
+    // Find the right most point on the hull
+    var rightMost = 0;
+    var highestXCoord = verts[0].x;
+    for (i = 1; i < verts.length; ++i) {
+        var x = verts[i].x;
+        if (x > highestXCoord) {
+            highestXCoord = x;
+            rightMost = i;
+        }
+        // If matching x then take farthest negative y
+        else if (x == highestXCoord) {
+            if (verts[i].y < verts[rightMost].y) {
+                rightMost = i;
+            }
+        }
+    }
+
+    var hull = new Array(MAX_POLY_VERTEX_COUNT);
+    var outCount = 0;
+    var indexHull = rightMost;
+
+    for (; ;) {
+        hull[outCount] = indexHull;
+
+        // Search for next index that wraps around the hull
+        // by computing cross products to find the most counter-clockwise
+        // vertex in the set, given the previos hull index
+        var nextHullIndex = 0;
+        for (i = 1; i < verts.length; ++i) {
+            // Skip if same coordinate as we need three unique
+            // points in the set to perform a cross product
+            if (nextHullIndex == indexHull) {
+                nextHullIndex = i;
+                continue;
+            }
+
+            // Cross every set of three unique vertices
+            // Record each counter clockwise third vertex and add
+            // to the output hull
+            // See : http://www.oocities.org/pcgpe/math2d.html
+            var e1 = new Vec2();
+            var e2 = new Vec2();
+            VecMath.sub(e1, verts[nextHullIndex], verts[hull[outCount]]);
+            VecMath.sub(e2, verts[i], verts[hull[outCount]]);
+            var c = VecMath.cross(e1, e2);
+            if (c < 0.0) {
+                nextHullIndex = i;
+            }
+
+            // Cross product is zero then e vectors are on same line
+            // therefore want to record vertex farthest along that line
+            if (c == 0.0 && e2.lengthSq() > e1.lengthSq()) {
+                nextHullIndex = i;
+            }
+        }
+
+        ++outCount;
+        indexHull = nextHullIndex;
+
+        // Conclude algorithm upon wrap-around
+        if (nextHullIndex == rightMost) {
+            this.vertexCount = outCount;
+            break;
+        }
+    }
+
+    // Copy vertices into shape's vertices
+    for (i = 0; i < this.vertexCount; ++i) {
+        this.vertices[i].setFrom(verts[hull[i]]);
+    }
+
+    // Compute face normals
+    for (i = 0; i < this.vertexCount; ++i) {
+        var face = new Vec2();
+        VecMath.sub(face, this.vertices[(i + 1) % this.vertexCount], this.vertices[i]);
+
+        // Calculate normal with 2D cross product between vector and scalar
+        this.normals[i].set(face.y, -face.x);
+        this.normals[i].normalize();
+    }
+};
+
+PolygonShape.prototype.setBox = function (hw, hh) {
+    this.vertexCount = 4;
+    this.vertices[0].set(-hw, -hh);
+    this.vertices[1].set(hw, -hh);
+    this.vertices[2].set(hw, hh);
+    this.vertices[3].set(-hw, hh);
+    this.normals[0].set(0.0, -1.0);
+    this.normals[1].set(1.0, 0.0);
+    this.normals[2].set(0.0, 1.0);
+    this.normals[3].set(-1.0, 0.0);
+};
+
+PolygonShape.prototype.getSupport = function (dir) {
+    var bestProjection = Number.NEGATIVE_INFINITY;
+    var bestVertex = null;
+    for (var i = 0; i < this.vertexCount; ++i) {
+        var v = this.vertices[i];
+        var projection = VecMath.dot(v, dir);
+        if (projection > bestProjection) {
+            bestVertex = v;
+            bestProjection = projection;
+        }
+    }
+    return bestVertex;
+};
+
+PolygonShape.prototype.computeMass = function (density) {
+    var i;
+
+    // Calculate centroid and moment of inertia
+    var c = new Vec2(0.0, 0.0); // centroid
+    var area = 0.0;
+    var I = 0.0;
+    var k_inv3 = 1.0 / 3.0;
+
+    for (i = 0; i < this.vertexCount; ++i) {
+        // Triangle vertices, third vertex implied as (0, 0)
+        var p1 = this.vertices[i];
+        var p2 = this.vertices[(i + 1) % this.vertexCount];
+
+        var D = VecMath.cross(p1, p2);
+        var triangleArea = 0.5 * D;
+
+        area += triangleArea;
+
+        // Use area to weight the centroid average, not just vertex position
+        var weight = triangleArea * k_inv3;
+        VecMath.addMulScarlar(c, c, p1, weight);
+        VecMath.addMulScarlar(c, c, p2, weight);
+
+        var intx2 = p1.x * p1.x + p2.x * p1.x + p2.x * p2.x;
+        var inty2 = p1.y * p1.y + p2.y * p1.y + p2.y * p2.y;
+        I += (0.25 * k_inv3 * D) * (intx2 + inty2);
+    }
+
+    VecMath.mulScalar(c, c, 1 / area);
+
+    // Translate vertices to centroid (make the centroid (0, 0)
+    // for the polygon in model space)
+    // Not really necessary, but I like doing this anyway
+    for (i = 0; i < this.vertexCount; ++i) {
+        VecMath.sub(this.vertices[i], this.vertices[i], c);
+    }
+
+    this.body.mass = density * area;
+    this.body.invMass = (this.body.mass != 0.0) ? 1.0 / this.body.mass : 0.0;
+    this.body.inertia = I * density;
+    this.body.invInertia = (this.body.inertia != 0.0) ? 1.0 / this.body.inertia : 0.0;
+};
+
+PolygonShape.prototype.initialize = function () {
+    this.computeMass(1);
+};
+
+PolygonShape.prototype.setOrient = function (radians) {
+    this.transform.set(radians);
+};
+
+function Body(shape) {
+    this.position = new Vec2();
+    this.velocity = new Vec2();
+    this.angularVelocity = 0;
+    this.force = new Vec2();
+    this.torque = 0;
+    this.orient = PhysicsMath.random(-PhysicsMath.PI, PhysicsMath.PI);
+    this.mass = 0;
+    this.invMass = 0;
+    this.inertia = 0;
+    this.invInertia = 0;
+    this.staticFriction = 0.5;
+    this.dynamicFriction = 0.3;
+    this.restitution = 0.2;
+    this.shape = shape;
+    this.shape.body = this;
+    this.shape.initialize();
+}
+
+Body.prototype.applyImpulse = function (impulse, contactVector) {
+    VecMath.addMulScarlar(this.velocity, this.velocity, impulse, this.invMass);
+    this.angularVelocity += this.invInertia * VecMath.cross(contactVector, impulse);
+};
+
+Body.prototype.applyForce = function (force) {
+    VecMath.add(this.force, this.force, force);
+};
+
+Body.prototype.setStatic = function () {
+    this.mass = 0;
+    this.invMass = 0;
+    this.inertia = 0;
+    this.invInertia = 0;
+};
+
+Body.prototype.setOrient = function (radians) {
+    this.orient = radians;
+    this.shape.setOrient(radians);
+};
+
+var Collisions = {
+    dispatch: [],
+    add: function (typeA, typeB, instance) {
+        if (typeof this.dispatch[typeA] == "undefined") {
+            this.dispatch[typeA] = [];
+        }
+        this.dispatch[typeA][typeB] = instance;
+    }
+};
+
+function Collision() {
+}
+
+Collision.prototype.handleCollision = function (m, a, b) {
+    throw new Error("Abstract");
+};
+
+function CollisionCircleCircle() {
+    Collision.call(this);
+}
+
+CollisionCircleCircle.extend(Collision);
+
+CollisionCircleCircle.prototype.handleCollision = function (m, a, b) {
+    var A = a.shape;
+    var B = b.shape;
+
+    // Calculate translational vector, which is normal
+    var normal = Vec2Pool.get();
+    VecMath.sub(normal, b.position, a.position);
+
+    // Calculate length squared
+    var dist_sqr = normal.lengthSq();
+    var radius = A.radius + B.radius;
+
+    // Not in contact
+    if (dist_sqr >= radius * radius) {
+        m.contactCount = 0;
+        return;
+    }
+
+    // Square root out the actual distance
+    var distance = Math.sqrt(dist_sqr);
+
+    // We have one contact
+    m.contactCount = 1;
+
+    // Circle is exact on the center of the other circle
+    if (distance == 0.0) {
+        m.penetration = A.radius;
+        m.normal.set(1.0, 0.0);
+        m.contacts[0].setFrom(a.position);
+    }
+    else {
+        m.penetration = radius - distance;
+        VecMath.mulScalar(m.normal, normal, 1 / distance);
+        VecMath.mulScalar(m.contacts[0], m.normal, A.radius);
+        VecMath.add(m.contacts[0], m.contacts[0], a.position);
+    }
+};
+
+function CollisionCircleHalfSpace() {
+    Collision.call(this);
+}
+
+CollisionCircleHalfSpace.extend(Collision);
+
+CollisionCircleHalfSpace.prototype.handleCollision = function (m, a, b) {
+    var A = a.shape;
+    var B = b.shape;
+    var normal = B.normal;
+    var halfspacePos = Vec2Pool.get();
+    VecMath.mulScalar(halfspacePos, normal, -B.distance);
+
+    // Get distance between halfspace and circle
+    var sub = Vec2Pool.get();
+    VecMath.sub(sub, halfspacePos, a.position);
+
+    // Calculate length squared
+    var distance = -VecMath.dot(sub, normal);
+
+    // Not in contact
+    if (distance >= A.radius) {
+        m.contactCount = 0;
+        return;
+    }
+
+    // We have one contact
+    m.contactCount = 1;
+    m.penetration = A.radius - distance;
+    VecMath.mulScalar(m.normal, normal, -1);
+    VecMath.addMulScarlar(m.contacts[0], a.position, m.normal, A.radius);
+};
+
+function CollisionHalfSpaceCircle() {
+    Collision.call(this);
+    this.instance = new CollisionCircleHalfSpace();
+}
+
+CollisionHalfSpaceCircle.extend(Collision);
+
+CollisionHalfSpaceCircle.prototype.handleCollision = function (m, a, b) {
+    this.instance.handleCollision(m, b, a);
+    if (m.contactCount > 0) {
+        VecMath.neg(m.normal, m.normal);
+    }
+};
+
+function CollisionCirclePolygon() {
+    Collision.call(this);
+}
+CollisionCirclePolygon.extend(Collision);
+
+CollisionCirclePolygon.prototype.handleCollision = function (m, a, b) {
+    var A = a.shape;
+    var B = b.shape;
+    m.contactCount = 0;
+
+    // Get distance between halfspace and circle
+    var sub = Vec2Pool.get();
+    VecMath.sub(sub, a.position, b.position);
+
+    // Transform circle center to Polygon model space
+    // Vec2 center = a->position;
+    // center = B->u.Transpose( ) * (center - b->position);
+    var transpose = Mat2Pool.get();
+    MatMath.transpose(transpose, B.transform);
+    var center = Vec2Pool.get();
+    MatMath.mul(center, transpose, sub);
+
+    // Find edge with minimum penetration
+    // Exact concept as using support points in Polygon vs Polygon
+    var separation = Number.NEGATIVE_INFINITY;
+    var faceNormal = 0;
+    for (var i = 0; i < B.vertexCount; ++i) {
+        var subV = Vec2Pool.get();
+        VecMath.sub(subV, center, B.vertices[i]);
+        var s = VecMath.dot(B.normals[i], subV);
+        if (s > A.radius) {
+            return;
+        }
+        if (s > separation) {
+            separation = s;
+            faceNormal = i;
+        }
+    }
+
+    // Grab face's vertices
+    var v1 = B.vertices[faceNormal];
+    var i2 = faceNormal + 1 < B.vertexCount ? faceNormal + 1 : 0;
+    var v2 = B.vertices[i2];
+
+    // Check to see if center is within polygon
+    if (separation < PhysicsMath.EPSILON) {
+        // m->contact_count = 1;
+        // m->normal = -(B->u * B->m_normals[faceNormal]);
+        // m->contacts[0] = m->normal * A->radius + a->position;
+        // m->penetration = A->radius;
+        m.contactCount = 1;
+        MatMath.mul(m.normal, B.transform, B.normals[faceNormal]);
+        VecMath.neg(m.normal, m.normal);
+        VecMath.addMulScarlar(m.contacts[0], a.position, m.normal, A.radius);
+        m.penetration = A.radius;
+        return;
+    }
+
+    // Determine which voronoi region of the edge center of circle lies within
+    // real dot1 = Dot( center - v1, v2 - v1 );
+    // real dot2 = Dot( center - v2, v1 - v2 );
+    // m->penetration = A->radius - separation;
+    var dot1 = VecMath.dotComponents(center.x - v1.x, center.y - v1.y, v2.x - v1.x, v2.y - v1.y);
+    var dot2 = VecMath.dotComponents(center.x - v2.x, center.y - v2.y, v1.x - v2.x, v1.y - v2.y);
+    m.penetration = A.radius - separation;
+
+    // Closest to v1
+    if (dot1 <= 0.0) {
+        if (VecMath.distanceSq(center, v1) > A.radius * A.radius) {
+            return;
+        }
+
+        // m->contact_count = 1;
+        // Vec2 n = v1 - center;
+        // n = B->u * n;
+        // n.Normalize( );
+        // m->normal = n;
+        // v1 = B->u * v1 + b->position;
+        // m->contacts[0] = v1;
+
+        m.contactCount = 1;
+        VecMath.sub(m.normal, v1, center);
+        MatMath.mul(m.normal, B.transform, m.normal);
+        m.normal.normalize();
+        MatMath.mul(m.contacts[0], B.transform, v1);
+        VecMath.add(m.contacts[0], m.contacts[0], b.position);
+    }
+    // Closest to v2
+    else if (dot2 <= 0.0) {
+        if (VecMath.distanceSq(center, v2) > A.radius * A.radius) {
+            return;
+        }
+
+        // m->contact_count = 1;
+        // Vec2 n = v2 - center;
+        // v2 = B->u * v2 + b->position;
+        // m->contacts[0] = v2;
+        // n = B->u * n;
+        // n.Normalize( );
+        // m->normal = n;
+
+        m.contactCount = 1;
+        VecMath.sub(m.normal, v2, center);
+        MatMath.mul(m.normal, B.transform, m.normal);
+        m.normal.normalize();
+        MatMath.mul(m.contacts[0], B.transform, v2);
+        VecMath.add(m.contacts[0], m.contacts[0], b.position);
+    }
+    // Closest to face
+    else {
+        var n = B.normals[faceNormal];
+        if (VecMath.dotComponents(center.x - v1.x, center.y - v1.y, n.x, n.y) > A.radius) {
+            return;
+        }
+
+        // n = B->u * n;
+        // m->normal = -n;
+        // m->contacts[0] = m->normal * A->radius + a->position;
+        // m->contact_count = 1;
+
+        m.contactCount = 1;
+        MatMath.mul(m.normal, B.transform, n);
+        VecMath.neg(m.normal, m.normal);
+        VecMath.addMulScarlar(m.contacts[0], a.position, m.normal, A.radius);
+    }
+};
+
+function CollisionPolygonCircle() {
+    Collision.call(this);
+    this.instance = new CollisionCirclePolygon();
+}
+
+CollisionPolygonCircle.extend(Collision);
+
+CollisionPolygonCircle.prototype.handleCollision = function (m, a, b) {
+    this.instance.handleCollision(m, b, a);
+    if (m.contactCount > 0) {
+        VecMath.neg(m.normal, m.normal);
+    }
+};
+
+function CollisionPolygonPolygon() {
+    Collision.call(this);
+}
+CollisionPolygonPolygon.extend(Collision);
+
+CollisionPolygonPolygon.prototype.findAxisLeastPenetration = function (faceIndex, A, B) {
+    var bestDistance = Number.NEGATIVE_INFINITY;
+    var bestIndex = 0;
+
+    for (var i = 0; i < A.vertexCount; ++i) {
+        // Retrieve a face normal from A
+        // Vec2 n = A->m_normals[i];
+        // Vec2 nw = A->u * n;
+        var nw = Vec2Pool.get();
+        MatMath.mul(nw, A.transform, A.normals[i]);
+
+        // Transform face normal into B's model space
+        // Mat2 buT = B->u.Transpose( );
+        // n = buT * nw;
+        var buT = Mat2Pool.get();
+        MatMath.transpose(buT, B.transform);
+        var n = Vec2Pool.get();
+        var nNeg = Vec2Pool.get();
+        MatMath.mul(n, buT, nw);
+        VecMath.neg(nNeg, n);
+
+        // Retrieve support point from B along -n
+        // Vec2 s = B->GetSupport( -n );
+        var s = B.getSupport(nNeg);
+
+        // Retrieve vertex on face from A, transform into
+        // B's model space
+        // Vec2 v = A->m_vertices[i];
+        // v = A->u * v + A->body->position;
+        // v -= B->body->position;
+        // v = buT * v;
+        var vt = Vec2Pool.get();
+        MatMath.mul(vt, A.transform, A.vertices[i]);
+        VecMath.add(vt, vt, A.body.position);
+        VecMath.sub(vt, vt, B.body.position);
+        var v = Vec2Pool.get();
+        MatMath.mul(v, buT, vt);
+
+        // Compute penetration distance (in B's model space)
+        // real d = Dot( n, s - v );
+        var d = VecMath.dotComponents(n.x, n.y, s.x - v.x, s.y - v.y);
+
+        // Store greatest distance
+        if (d > bestDistance) {
+            bestDistance = d;
+            bestIndex = i;
+        }
+    }
+
+    faceIndex[0] = bestIndex;
+    return bestDistance;
+};
+
+CollisionPolygonPolygon.prototype.findIncidentFace = function (v, RefPoly, IncPoly, referenceIndex) {
+    var referenceNormal = Vec2Pool.get();
+
+    // Calculate normal in incident's frame of reference
+    // referenceNormal = RefPoly->u * referenceNormal; // To world space
+    // referenceNormal = IncPoly->u.Transpose( ) * referenceNormal; // To incident's model space
+    MatMath.mul(referenceNormal, RefPoly.transform, RefPoly.normals[referenceIndex]); // To world space
+    var Iut = Mat2Pool.get();
+    MatMath.transpose(Iut, IncPoly.transform);
+    MatMath.mul(referenceNormal, Iut, referenceNormal); // To incident's model space
+
+    // Find most anti-normal face on incident polygon
+    var incidentFace = 0;
+    var minDot = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < IncPoly.vertexCount; ++i) {
+        // real dot = Dot( referenceNormal, IncPoly->m_normals[i] );
+        var dot = VecMath.dot(referenceNormal, IncPoly.normals[i]);
+        if (dot < minDot) {
+            minDot = dot;
+            incidentFace = i;
+        }
+    }
+
+    // Assign face vertices for incidentFace
+    // v[0] = IncPoly->u * IncPoly->m_vertices[incidentFace] + IncPoly->body->position;
+    // incidentFace = incidentFace + 1 >= (int32)IncPoly->m_vertexCount ? 0 : incidentFace + 1;
+    // v[1] = IncPoly->u * IncPoly->m_vertices[incidentFace] + IncPoly->body->position;
+
+    MatMath.mul(v[0], IncPoly.transform, IncPoly.vertices[incidentFace]);
+    VecMath.add(v[0], v[0], IncPoly.body.position);
+    incidentFace = incidentFace + 1 >= IncPoly.vertexCount ? 0 : incidentFace + 1;
+    MatMath.mul(v[1], IncPoly.transform, IncPoly.vertices[incidentFace]);
+    VecMath.add(v[1], v[1], IncPoly.body.position);
+};
+
+CollisionPolygonPolygon.prototype.clip = function (n, c, face) {
+    var sp = 0;
+    var out = [
+        Vec2Pool.get(),
+        Vec2Pool.get()
+    ];
+    VecMath.clone(out[0], face[0]);
+    VecMath.clone(out[1], face[1]);
+
+    // Retrieve distances from each endpoint to the line
+    // d = ax + by - c
+    // real d1 = Dot( n, face[0] ) - c;
+    // real d2 = Dot( n, face[1] ) - c;
+    var d1 = VecMath.dot(n, face[0]) - c;
+    var d2 = VecMath.dot(n, face[1]) - c;
+
+    // If negative (behind plane) clip
+    // if(d1 <= 0.0f) out[sp++] = face[0];
+    // if(d2 <= 0.0f) out[sp++] = face[1];
+    if (d1 <= 0.0) out[sp++].setFrom(face[0]);
+    if (d2 <= 0.0) out[sp++].setFrom(face[1]);
+
+    // If the points are on different sides of the plane
+    if (d1 * d2 < 0.0) // less than to ignore -0.0f
+    {
+        // Push intersection point
+        // real alpha = d1 / (d1 - d2);
+        // out[sp] = face[0] + alpha * (face[1] - face[0]);
+        // ++sp;
+
+        var alpha = d1 / (d1 - d2);
+
+        var o = out[sp++];
+        VecMath.sub(o, face[1], face[0]);
+        VecMath.mulScalar(o, o, alpha);
+        VecMath.add(o, o, face[0]);
+    }
+
+    // Assign our new converted values
+    face[0] = out[0];
+    face[1] = out[1];
+
+    // assert( sp != 3 );
+
+    return sp;
+};
+
+CollisionPolygonPolygon.prototype.handleCollision = function (m, a, b) {
+    var A = a.shape;
+    var B = b.shape;
+    m.contactCount = 0;
+
+    // Check for a separating axis with A's face planes
+    var faceA = [ 0 ];
+    var penetrationA = this.findAxisLeastPenetration(faceA, A, B);
+    if (penetrationA >= 0.0) {
+        return;
+    }
+
+    // Check for a separating axis with B's face planes
+    var faceB = [ 0 ];
+    var penetrationB = this.findAxisLeastPenetration(faceB, B, A);
+    if (penetrationB >= 0.0) {
+        return;
+    }
+
+    var referenceIndex;
+    var flip; // Always point from a to b
+
+    var RefPoly; // Reference
+    var IncPoly; // Incident
+
+    // Determine which shape contains reference face
+    if (PhysicsMath.gt(penetrationA, penetrationB)) {
+        RefPoly = A;
+        IncPoly = B;
+        referenceIndex = faceA[0];
+        flip = false;
+    } else {
+        RefPoly = B;
+        IncPoly = A;
+        referenceIndex = faceB[0];
+        flip = true;
+    }
+
+    // World space incident face
+    var incidentFace = VecMath.arrayOfPooled(2);
+    this.findIncidentFace(incidentFace, RefPoly, IncPoly, referenceIndex);
+
+    // y
+    // ^ .n ^
+    // +---c ------posPlane--
+    // x < | i |\
+    // +---+ c-----negPlane--
+    // \ v
+    // r
+    //
+    // r : reference face
+    // i : incident poly
+    // c : clipped point
+    // n : incident normal
+
+    // Setup reference face vertices
+    // Transform vertices to world space
+    // v1 = RefPoly->u * v1 + RefPoly->body->position;
+    // v2 = RefPoly->u * v2 + RefPoly->body->position;
+    var v1o = RefPoly.vertices[referenceIndex];
+    referenceIndex = referenceIndex + 1 == RefPoly.vertexCount ? 0 : referenceIndex + 1;
+    var v2o = RefPoly.vertices[referenceIndex];
+
+    var v1 = Vec2Pool.get();
+    var v2 = Vec2Pool.get();
+    MatMath.mul(v1, RefPoly.transform, v1o);
+    VecMath.add(v1, v1, RefPoly.body.position);
+    MatMath.mul(v2, RefPoly.transform, v2o);
+    VecMath.add(v2, v2, RefPoly.body.position);
+
+    // Calculate reference face side normal in world space
+    // Vec2 sidePlaneNormal = (v2 - v1);
+    // sidePlaneNormal.Normalize( );
+    var sidePlaneNormal = Vec2Pool.get();
+    var sidePlaneNormalNeg = Vec2Pool.get();
+    VecMath.sub(sidePlaneNormal, v2, v1);
+    sidePlaneNormal.normalize();
+    VecMath.neg(sidePlaneNormalNeg, sidePlaneNormal);
+
+    // Orthogonalize
+    // Vec2 refFaceNormal( sidePlaneNormal.y, -sidePlaneNormal.x );
+    var refFaceNormal = Vec2Pool.get();
+    refFaceNormal.set(sidePlaneNormal.y, -sidePlaneNormal.x);
+
+    // ax + by = c
+    // c is distance from origin
+    // real refC = Dot( refFaceNormal, v1 );
+    // real negSide = -Dot( sidePlaneNormal, v1 );
+    // real posSide = Dot( sidePlaneNormal, v2 );
+    var refC = VecMath.dot(refFaceNormal, v1);
+    var negSide = -VecMath.dot(sidePlaneNormal, v1);
+    var posSide = VecMath.dot(sidePlaneNormal, v2);
+
+    // Clip incident face to reference face side planes
+    // if(Clip( -sidePlaneNormal, negSide, incidentFace ) < 2)
+    if (this.clip(sidePlaneNormalNeg, negSide, incidentFace) < 2) {
+        return; // Due to floating point error, possible to not have required points
+    }
+
+    // if(Clip( sidePlaneNormal, posSide, incidentFace ) < 2)
+    if (this.clip(sidePlaneNormal, posSide, incidentFace) < 2) {
+        return; // Due to floating point error, possible to not have required points
+    }
+
+    // Flip
+    m.normal.setFrom(refFaceNormal);
+    if (flip) {
+        VecMath.neg(m.normal, m.normal);
+    }
+
+    // Keep points behind reference face
+    var cp = 0; // clipped points behind reference face
+    var separation = VecMath.dot(refFaceNormal, incidentFace[0]) - refC;
+    if (separation <= 0.0) {
+        m.contacts[cp].setFrom(incidentFace[0]);
+        m.penetration = -separation;
+        ++cp;
+    }
+    else {
+        m.penetration = 0;
+    }
+
+    separation = VecMath.dot(refFaceNormal, incidentFace[1]) - refC;
+
+    if (separation <= 0.0) {
+        m.contacts[cp].setFrom(incidentFace[1]);
+
+        m.penetration += -separation;
+        ++cp;
+
+        // Average penetration
+        m.penetration /= cp;
+    }
+
+    m.contactCount = cp;
+};
+
+Collisions.add(ShapeType.Circle, ShapeType.Circle, new CollisionCircleCircle());
+Collisions.add(ShapeType.Circle, ShapeType.HalfSpace, new CollisionCircleHalfSpace());
+Collisions.add(ShapeType.HalfSpace, ShapeType.Circle, new CollisionHalfSpaceCircle());
+Collisions.add(ShapeType.Circle, ShapeType.Polygon, new CollisionCirclePolygon());
+Collisions.add(ShapeType.Polygon, ShapeType.Circle, new CollisionPolygonCircle());
+Collisions.add(ShapeType.Polygon, ShapeType.Polygon, new CollisionPolygonPolygon());
+
+function Manifold() {
+    this.A = null;
+    this.B = null;
+    this.penetration = 0.0;
+    this.normal = new Vec2();
+    this.contacts = [new Vec2(), new Vec2()];
+    this.contactCount = 0;
+    this.e = 0.0;
+    this.df = 0.0;
+    this.sf = 0.0;
+}
+
+Manifold.prototype.solve = function () {
+    var ia = this.A.shape.type;
+    var ib = this.B.shape.type;
+    Collisions.dispatch[ia][ib].handleCollision(this, this.A, this.B);
+};
+
+Manifold.prototype.initialize = function () {
+    // Calculate average restitution
+    this.e = Math.min(this.A.restitution, this.B.restitution);
+
+    // Calculate static and dynamic friction
+    this.sf = Math.sqrt(this.A.staticFriction * this.A.staticFriction);
+    this.df = Math.sqrt(this.A.dynamicFriction * this.A.dynamicFriction);
+};
+
+Manifold.prototype.infiniteMassCorrection = function () {
+    this.A.velocity.set(0, 0);
+    this.B.velocity.set(0, 0);
+};
+
+Manifold.prototype.applyImpulse = function () {
+    // Early out and positional correct if both objects have infinite mass
+    if (PhysicsMath.equal(this.A.invMass + this.B.invMass, 0)) {
+        this.infiniteMassCorrection();
+        return;
+    }
+
+    var normal = this.normal;
+    var A = this.A;
+    var B = this.B;
+
+    var tempVector = Vec2Pool.get();
+    var ra = Vec2Pool.get();
+    var rb = Vec2Pool.get();
+    var rva = Vec2Pool.get();
+    var rvb = Vec2Pool.get();
+    var rv = Vec2Pool.get();
+    var impulse = Vec2Pool.get();
+    var negativeImpulse = Vec2Pool.get();
+    var tangent = Vec2Pool.get();
+
+    for (var i = 0; i < this.contactCount; ++i) {
+        // Calculate radii from COM to contact
+        VecMath.sub(ra, this.contacts[i], A.position);
+        VecMath.sub(rb, this.contacts[i], B.position);
+
+        // Relative velocity
+        VecMath.crossAV(tempVector, A.angularVelocity, ra);
+        VecMath.sub(rva, A.velocity, tempVector);
+        VecMath.crossAV(tempVector, B.angularVelocity, rb);
+        VecMath.add(rvb, B.velocity, tempVector);
+        VecMath.sub(rv, rvb, rva);
+
+        // Relative velocity along the normal
+        var contactVel = VecMath.dot(rv, normal);
+
+        // Do not resolve if velocities are separating
+        if (contactVel > 0) {
+            return;
+        }
+
+        var raCrossN = VecMath.cross(ra, normal);
+        var rbCrossN = VecMath.cross(rb, normal);
+        var invMassSum = A.invMass + B.invMass + (raCrossN * raCrossN) * A.invInertia + (rbCrossN * rbCrossN) * B.invInertia;
+
+        // Calculate impulse scalar
+        var j = -(1.0 + this.e) * contactVel;
+        j /= invMassSum;
+        j /= this.contactCount;
+
+        // Apply impulse
+        VecMath.mulScalar(impulse, normal, j);
+        VecMath.neg(negativeImpulse, impulse);
+        A.applyImpulse(negativeImpulse, ra);
+        B.applyImpulse(impulse, rb);
+
+        // Friction impulse
+        VecMath.crossAV(tempVector, A.angularVelocity, ra);
+        VecMath.sub(rva, A.velocity, tempVector);
+        VecMath.crossAV(tempVector, B.angularVelocity, rb);
+        VecMath.add(rvb, B.velocity, tempVector);
+        VecMath.sub(rv, rvb, rva);
+
+        // Get tangent normal from relative velocity
+        VecMath.addMulScarlar(tangent, rv, normal, -VecMath.dot(rv, normal));
+        tangent.normalize();
+
+        // Calculate tangent impulse scalar
+        var jt = -VecMath.dot(rv, tangent);
+        jt /= invMassSum;
+        jt /= this.contactCount;
+
+        // Don't apply tiny friction impulses
+        if (PhysicsMath.equal(jt, 0.0)) {
+            return;
+        }
+
+        // Coulumb's law
+        if (Math.abs(jt) < j * this.sf) {
+            VecMath.mulScalar(impulse, tangent, jt);
+        } else {
+            VecMath.mulScalar(impulse, tangent, -j);
+            VecMath.mulScalar(impulse, impulse, this.df);
+        }
+
+        // Apply friction impulse
+        VecMath.neg(negativeImpulse, impulse);
+        A.applyImpulse(negativeImpulse, ra);
+        B.applyImpulse(impulse, rb);
+    }
+};
+
+Manifold.prototype.positionalCorrection = function () {
+    var correction = Math.max(this.penetration - PhysicsMath.PENETRATION_ALLOWANCE, 0.0) / (this.A.invMass + this.B.invMass) * PhysicsMath.PENETRATION_CORRETION;
+    VecMath.addMulScarlar(this.A.position, this.A.position, this.normal, -this.A.invMass * correction);
+    VecMath.addMulScarlar(this.B.position, this.B.position, this.normal, this.B.invMass * correction);
+};
+
+var ManifoldPool = new Pool(function () {
+    return new Manifold();
+});
+ManifoldPool.expand(100);
+
+function Scene(dt, iterations) {
+    this.dt = dt;
+    this.iterations = iterations;
+    this.bodies = new ArrayList();
+    this.manifolds = new ArrayList();
+}
+
+Scene.prototype.addBody = function (position, shape) {
+    var body = new Body(shape);
+    body.position = position;
+    this.bodies.add(body);
+    return body;
+};
+
+Scene.prototype.integrateForces = function (b, dt) {
+    if (b.invMass == 0) {
+        return;
+    }
+    var dts = dt * 0.5;
+
+    VecMath.addMulScarlar(b.velocity, b.velocity, b.force, b.invMass * dts);
+    VecMath.addMulScarlar(b.velocity, b.velocity, PhysicsMath.GRAVITY, dts);
+    b.angularVelocity += b.torque * b.invInertia * dts;
+};
+
+Scene.prototype.integrateVelocity = function (b, dt) {
+    if (b.invMass == 0) {
+        return;
+    }
+    VecMath.addMulScarlar(b.position, b.position, b.velocity, dt);
+    b.orient += b.angularVelocity * dt;
+    b.setOrient(b.orient);
+
+    this.integrateForces(b, dt);
+};
+
+Scene.prototype.step = function () {
+    var i, j;
+
+    // Generate new collision info
+    this.manifolds.clear();
+    for (i = 0; i < this.bodies.size(); ++i) {
+        var A = this.bodies.get(i);
+        for (j = i + 1; j < this.bodies.size(); ++j) {
+            var B = this.bodies.get(j);
+            if (A.invMass == 0 && B.invMass == 0) {
+                continue;
+            }
+
+            var m = ManifoldPool.get();
+            m.A = A;
+            m.B = B;
+            m.solve();
+
+            if (m.contactCount > 0) {
+                this.manifolds.add(m);
+            }
+        }
+    }
+
+    // Integrate forces
+    for (i = 0; i < this.bodies.size(); ++i) {
+        this.integrateForces(this.bodies.get(i), this.dt);
+    }
+
+    // Initialize collision
+    for (i = 0; i < this.manifolds.size(); ++i) {
+        this.manifolds.get(i).initialize();
+    }
+
+    // Solve collisions
+    for (j = 0; j < this.iterations; ++j) {
+        for (i = 0; i < this.manifolds.size(); ++i) {
+            this.manifolds.get(i).applyImpulse();
+        }
+    }
+
+    // Integrate velocities
+    for (i = 0; i < this.bodies.size(); ++i) {
+        this.integrateVelocity(this.bodies.get(i), this.dt);
+    }
+
+    // Correct positions
+    for (i = 0; i < this.manifolds.size(); ++i) {
+        this.manifolds.get(i).positionalCorrection();
+    }
+
+    // Clear all forces
+    for (i = 0; i < this.bodies.size(); ++i) {
+        var b = this.bodies.get(i);
+        b.force.set(0, 0);
+        b.torque = 0;
+    }
+};
+
+(function () {
+    var scene = new Scene(PhysicsMath.DT, 10);
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+
+    function init() {
+        var shape, body;
+
+        /*
+        shape = new CircleShape(30);
+        body = scene.addBody(new Vec2(0, 0), shape);
+        body.setOrient(0);
+        body.setStatic();
+        */
+
+        /*
+        shape = new HalfSpaceShape(new Vec2(0, -1), 100, 600);
+        body = scene.addBody(new Vec2(0, 0), shape);
+        body.setOrient(0);
+        body.setStatic();
+        */
+
+        shape = new PolygonShape();
+        shape.setBox(200, 10);
+        body = scene.addBody(new Vec2(0, 200), shape);
+        body.setOrient(0);
+        body.setStatic();
+
+        shape = new PolygonShape();
+        shape.setBox(10, 200);
+        body = scene.addBody(new Vec2(-200, 0), shape);
+        body.setOrient(0);
+        body.setStatic();
+
+        shape = new PolygonShape();
+        shape.setBox(10, 200);
+        body = scene.addBody(new Vec2(200, 0), shape);
+        body.setOrient(0);
+        body.setStatic();
+
+        /*
+        shape = new CircleShape(15);
+        scene.addBody(new Vec2(1, -100), shape);
+        */
+
+        var cnt = 2;
+        var rad = 50;
+
+        for (var i = 0; i < cnt; i++) {
+            shape = new PolygonShape();
+            shape.setBox(rad, rad);
+            body = scene.addBody(new Vec2(0, -50 + i * -rad*2*1.1), shape);
+            body.setOrient(0);
+        }
+    }
+
+    function updateFrame() {
+        scene.step();
+    }
+
+    function renderFrame() {
+        var i, j;
+
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.save();
+        ctx.translate(w * 0.5, h * 0.5);
+
+        for (i = 0; i < scene.bodies.size(); ++i) {
+            var body = scene.bodies.get(i);
+            var shape = body.shape;
+            if (shape.type == ShapeType.Circle) {
+                ctx.beginPath();
+                ctx.arc(body.position.x, body.position.y, shape.radius, 0, Math.PI * 2, false);
+                ctx.strokeStyle = body.invMass == 0 ? "blue" : "green";
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(body.position.x, body.position.y);
+                ctx.lineTo(body.position.x + (Math.cos(body.orient) * shape.radius), body.position.y + (Math.sin(body.orient) * shape.radius));
+                ctx.strokeStyle = body.invMass == 0 ? "blue" : "green";
+                ctx.stroke();
+            } else if (shape.type == ShapeType.HalfSpace) {
+                var tx = -shape.normal.y;
+                var ty = shape.normal.x;
+                var px = shape.normal.x * -shape.distance;
+                var py = shape.normal.y * -shape.distance;
+                ctx.beginPath();
+                ctx.moveTo(px + tx * -shape.visualLength * 0.5, py + ty * -shape.visualLength * 0.5);
+                ctx.lineTo(px + tx * shape.visualLength * 0.5, py + ty * shape.visualLength * 0.5);
+                ctx.strokeStyle = body.invMass == 0 ? "blue" : "green";
+                ctx.stroke();
+            } else if (shape.type == ShapeType.Polygon) {
+                ctx.beginPath();
+                ctx.arc(body.position.x, body.position.y, 4, 0, Math.PI * 2, false);
+                ctx.fillStyle = "white";
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(body.position.x, body.position.y);
+                //ctx.transform(shape.transform.m00, shape.transform.m01, shape.transform.m10, shape.transform.m11, 0, 0);
+                ctx.rotate(body.orient);
+                ctx.beginPath();
+                for (j = 0; j < shape.vertexCount; j++) {
+                    var v = shape.vertices[j];
+                    if (j == 0) {
+                        ctx.moveTo(v.x, v.y);
+                    } else {
+                        ctx.lineTo(v.x, v.y);
+                    }
+                }
+                ctx.closePath();
+                ctx.strokeStyle = body.invMass == 0 ? "blue" : "green";
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Draw contacts
+        for (i = 0; i < scene.manifolds.size(); ++i) {
+            var manifold = scene.manifolds.get(i);
+            for (j = 0; j < manifold.contactCount; j++) {
+                var contact = manifold.contacts[j];
+                ctx.beginPath();
+                ctx.moveTo(contact.x, contact.y);
+                ctx.lineTo(contact.x + manifold.normal.x * 10, contact.y + manifold.normal.y * 10);
+                //ctx.arc(contact.x, contact.y, 4, 0, Math.PI * 2, false);
+                //ctx.fillStyle = "red";
+                //ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+
+        ctx.fillStyle = "white";
+        ctx.fillText("Vec2 instances: " + vec2InstanceCount, 10, 10);
+        ctx.fillText("Vec2 pooled: " + Vec2Pool.size() + "/" + Vec2Pool.capacity(), 10, 24);
+        ctx.fillText("Manifolds: " + scene.manifolds.size(), 10, 38);
+    }
+
+    var last = 0;
+    var dt = PhysicsMath.DT;
+    var oneSec = 1 / 1000;
+    var accum = 0;
+
+    var frame = function (param) {
+        requestAnimationFrame(frame, null);
+
+        // Clear pools and counters
+        vec2InstanceCount = 0;
+        Vec2Pool.clear();
+        ManifoldPool.clear();
+
+        // Calculate delta time
+        var now = typeof param != "undefined" ? param : 0;
+        var delta = (now - last) * oneSec;
+        if (delta > 0.1)
+            delta = 0.1;
+        last = now;
+
+        accum += delta;
+
+        while (accum >= dt) {
+            updateFrame();
+            accum -= dt;
+        }
+
+        renderFrame();
+    };
+
+    init();
+
+    requestAnimationFrame(frame, null);
+})();
+
+</script>
+</body>
+</html>

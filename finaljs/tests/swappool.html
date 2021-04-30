@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="../finaljs/core.js"></script>
+    <script type="text/javascript" src="../finaljs/utils/domutils.js"></script>
+</head>
+<body>
+<script type="text/javascript">
+    function SwapPool(count) {
+        var items = [];
+        var activeCount = 0;
+        var totalCount = 0;
+        totalCount = count;
+        for (var i = 0; i < count; i++) {
+            items[i] = {
+                _poolindex: i,
+                pos: new Float64Array(2)
+            };
+        }
+        return {
+            toString: function(){
+                var s = "";
+                for (var i = 0; i < totalCount; i++) {
+                    if (i > 0) {
+                        s += " ";
+                    }
+                    if (activeCount > 0 && i < activeCount) {
+                        s += "[" + items[i]._poolindex + "]";
+                    } else {
+                        s += items[i]._poolindex;
+                    }
+                    s += "=" + "("+items[i].pos[0]+","+items[i].pos[1]+")";
+                }
+                return s;
+            },
+            at: function(index){
+                return items[i];
+            },
+            size: function(){
+                return totalCount;
+            },
+            aquire: function(x, y){
+                /*
+                 3 Active items + 5 Dead items
+                 [0] [1] [2] 3 4 5 6 7
+
+                 New item - just make active count the new item
+                 [0] [1] [2] [ 3 ] 4 5 6 7
+
+                 increase active count
+                 */
+
+                if (!(activeCount < totalCount)) {
+                    throw new Error("Pool limit reached!");
+                }
+                var v = items[activeCount++];
+                v.pos[0] = x || 0;
+                v.pos[1] = y || 0;
+                return v;
+            },
+            remove: function(item){
+                /*
+                 3 Active items + 5 Dead items
+                 [0] [1] [2] 3 4 5 6 7
+
+                 1 is now inactive
+                 [0] [ 1 ] [2] 3 4 5 6 7
+
+                 find last active item
+                 [0] [ 1 ] { 2 } 3 4 5 6 7
+
+                 just swap these items
+                 [0] { 2 } [ 1 ] 3 4 5 6 7
+
+                 make sure indices are flipped as well
+                 [0] { 1 } [ 2 ] 3 4 5 6 7
+
+                 decrease active count
+                 */
+
+                // Find last active item
+                var itemIndex = item._poolindex;
+                var lastActiveIndex = activeCount-1;
+                if (itemIndex != lastActiveIndex) {
+                    var tmp = items[lastActiveIndex];
+                    items[lastActiveIndex] = items[itemIndex];
+                    items[lastActiveIndex]._poolindex = lastActiveIndex;
+                    items[itemIndex] = tmp;
+                    items[itemIndex]._poolindex = itemIndex;
+                }
+                activeCount--;
+            }
+        };
+    }
+
+    final.utils.DomUtils.write("New pool with 10 items");
+    var testPool = new SwapPool(10);
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("get item and set to 10, 20 (active count = 1)");
+    var first = testPool.aquire(10, 20);
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("get item (active count = 2)");
+    testPool.aquire();
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("get item (active count = 3)");
+    testPool.aquire();
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("get item and set 100, 200 (active count = 4)");
+    var last = testPool.aquire(100, 200);
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("remove first item (active count = 3)");
+    testPool.remove(first);
+    final.utils.DomUtils.write(testPool.toString());
+
+    final.utils.DomUtils.write("remove last item (active count = 2)");
+    testPool.remove(last);
+    final.utils.DomUtils.write(testPool.toString());
+
+</script>
+</body>
+</html>

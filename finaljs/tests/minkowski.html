@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script type="text/javascript">
+        function Vec2(x, y) {
+            if (typeof x != "undefined" && typeof y == "undefined") {
+                this.x = x.x;
+                this.y = x.y;
+            } else {
+                this.x = x || 0;
+                this.y = y || 0;
+            }
+        }
+
+        Vec2.prototype.add = function (v) {
+            return new Vec2(this.x + v.x, this.y + v.y);
+        };
+
+        Vec2.prototype.sub = function (v) {
+            return new Vec2(this.x - v.x, this.y - v.y);
+        };
+
+        Vec2.prototype.mult = function (v) {
+            return new Vec2(this.x * v.x, this.y * v.y);
+        };
+
+        Vec2.prototype.multScalar = function (scalar) {
+            return new Vec2(this.x * scalar, this.y * scalar);
+        };
+
+        Vec2.prototype.dot = function (v) {
+            return this.x * v.x + this.y * v.y;
+        };
+
+        Vec2.prototype.lengthSquared = function () {
+            return this.dot(this);
+        };
+
+        Vec2.prototype.length = function () {
+            return Math.sqrt(this.length());
+        };
+
+        Vec2.prototype.normalize = function () {
+            var l = this.length();
+            if (l == 0) {
+                l = 1;
+            }
+            var invL = 1 / l;
+            this.x *= invL;
+            this.y *= invL;
+            return this;
+        };
+
+        Vec2.prototype.set = function(v) {
+            this.x = v.x;
+            this.y = v.y;
+        };
+
+        Vec2.prototype.toString = function () {
+            return this.x + ", " + this.y;
+        };
+
+        Vec2.prototype.draw = function(ctx, color) {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 4, 0, Math.PI * 2, false);
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        };
+
+        function AABB(center, ext) {
+            this.center = center;
+            this.ext = ext;
+        }
+
+        AABB.prototype.getMin = function () {
+            return new Vec2(this.center).sub(this.ext);
+        };
+
+        AABB.prototype.getMax = function () {
+            return new Vec2(this.center).add(this.ext);
+        };
+
+        AABB.prototype.getMinkowskiDifference = function (other) {
+            var topLeft = this.getMin().sub(other.getMax());
+            var newExt = this.ext.add(other.ext);
+            return new AABB(topLeft.add(newExt), newExt);
+        };
+
+        AABB.prototype.draw = function (ctx, color) {
+            ctx.strokeStyle = color;
+            ctx.strokeRect(this.center.x - this.ext.x, this.center.y - this.ext.y, this.ext.x * 2, this.ext.y * 2);
+        };
+
+        AABB.prototype.containsPoint = function (p) {
+            return !(p.x < this.center.x - this.ext.x || p.x > this.center.x + this.ext.x ||
+                     p.y < this.center.y - this.ext.y || p.y > this.center.y + this.ext.y);
+        };
+
+        AABB.prototype.getClosestPoint = function(p){
+            var closest = new Vec2(p.x, p.y);
+            closest.x = Math.max(Math.min(closest.x, this.center.x + this.ext.x), this.center.x - this.ext.x);
+            closest.y = Math.max(Math.min(closest.y, this.center.y + this.ext.y), this.center.y - this.ext.y);
+            return closest;
+        };
+    </script>
+</head>
+<body>
+<canvas id="canvas" width="600" height="400" tabindex="1"></canvas>
+<script type="text/javascript">
+    (function () {
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width;
+        var h = canvas.height;
+        var mouse = new Vec2(-1, -1);
+        var mousestate = [];
+
+        var updatePos = function (pos, x, y) {
+            pos.x = (x - canvas.getBoundingClientRect().left) * (canvas.width / canvas.offsetWidth);
+            pos.y = (y - canvas.getBoundingClientRect().top) * (canvas.width / canvas.offsetWidth);
+        };
+
+        // Add mouse listeners
+        canvas.addEventListener("mousedown", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+            mousestate[e.button] = true;
+            return false;
+        }, false);
+        canvas.addEventListener("mousemove", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+            return false;
+        }, false);
+        canvas.addEventListener("mouseup", function (e) {
+            updatePos(mouse, e.clientX, e.clientY);
+            mousestate[e.button] = false;
+            return false;
+        }, false);
+        canvas.addEventListener("mouseout", function (e) {
+            return false;
+        }, false);
+
+        ctx.lineWidth = 2;
+
+        var boxA = new AABB(new Vec2(300, 200), new Vec2(150, 30));
+        var boxB = new AABB(new Vec2(300, 100), new Vec2(20, 20));
+
+        var mouseDown = false;
+        var mouseStart = new Vec2();
+        var activeBox = null;
+
+        var requestFrame = function () {
+            if (mousestate[0]) {
+                if (!mouseDown) {
+                    activeBox = null;
+                    if (boxA.containsPoint(mouse)) {
+                        activeBox = boxA;
+                    } else if (boxB.containsPoint(mouse)) {
+                        activeBox = boxB;
+                    }
+                    mouseDown = activeBox != null;
+                    mouseStart.set(mouse);
+                } else {
+                    var mouseDiff = mouse.sub(mouseStart);
+                    activeBox.center.x += mouseDiff.x;
+                    activeBox.center.y += mouseDiff.y;
+                    mouseStart.set(mouse);
+                }
+            } else {
+                if (mouseDown) {
+                    activeBox = null;
+                    mouseDown = false;
+                }
+            }
+
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.save();
+            ctx.translate(0, 0);
+
+            ctx.strokeStyle = "grey";
+            ctx.strokeRect(0, 0, w, h);
+
+            boxA.draw(ctx, "blue");
+
+            boxB.draw(ctx, "red");
+
+            var aabbDifference = boxA.getMinkowskiDifference(boxB);
+            aabbDifference.draw(ctx, "yellow");
+
+            var closest = aabbDifference.getClosestPoint(boxB.center);
+            closest.draw(ctx, "green");
+
+            ctx.restore();
+
+            requestAnimationFrame(requestFrame);
+        };
+        requestAnimationFrame(requestFrame);
+    })();
+</script>
+</body>
+</html>

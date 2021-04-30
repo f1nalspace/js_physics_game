@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+<script type="text/javascript">
+(function () {
+    function Vec2(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    Vec2.prototype.dot = function(v) {
+        return this.x * v.x + this.y * v.y;
+    };
+
+    Vec2.prototype.sub = function(v){
+        return new Vec2(this.x - v.x, this.y - v.y);
+    };
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+
+    var w = canvas.width, h = canvas.height;
+
+    ctx.lineWidth = 2;
+
+    ctx.translate(w * 0.5, h * 0.5);
+    ctx.scale(1, -1);
+
+    var intersectLineSegment = function(segment1, segment2) {
+        var result = {
+            x: null,
+            y: null,
+            t: null,
+            success: false
+        };
+        var denominator = ((segment2.v1.y - segment2.v0.y) * (segment1.v1.x - segment1.v0.x)) - ((segment2.v1.x - segment2.v0.x) * (segment1.v1.y - segment1.v0.y));
+        if (denominator == 0) {
+            return null;
+        }
+        var a = segment1.v0.y - segment2.v0.y;
+        var b = segment1.v0.x - segment2.v0.x;
+        var numerator1 = ((segment2.v1.x - segment2.v0.x) * a) - ((segment2.v1.y - segment2.v0.y) * b);
+        var numerator2 = ((segment1.v1.x - segment1.v0.x) * a) - ((segment1.v1.y - segment1.v0.y) * b);
+        a = numerator1 / denominator;
+        b = numerator2 / denominator;
+        if (a >= 0 && a <= 1 && b >= 0 && b <= 1) {
+            result.x = segment1.v0.x + (a * (segment1.v1.x - segment1.v0.x));
+            result.y = segment1.v0.y + (a * (segment1.v1.y - segment1.v0.y));
+            result.t = a;
+            result.success = true;
+        }
+        return result;
+    };
+
+    var line1 = {
+        v0: new Vec2(-100, 50),
+        v1: new Vec2(100, 80)
+    };
+
+    var line2 = {
+        v0: new Vec2(100, 80),
+        v1: new Vec2(-150, -50)
+    };
+
+    var updateFrame = function (now) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
+
+        ctx.beginPath();
+        ctx.moveTo(line1.v0.x, line1.v0.y);
+        ctx.lineTo(line1.v1.x, line1.v1.y);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(line2.v0.x, line2.v0.y);
+        ctx.lineTo(line2.v1.x, line2.v1.y);
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+
+        var intersectionPoint = intersectLineSegment(line1, line2);
+        if (intersectionPoint.success) {
+            ctx.beginPath();
+            ctx.arc(intersectionPoint.x, intersectionPoint.y, 4, 0, Math.PI * 2, false);
+            ctx.fillStyle = "green";
+            ctx.fill();
+        }
+
+        requestAnimationFrame(updateFrame);
+    };
+
+    requestAnimationFrame(updateFrame);
+
+})();
+
+</script>
+</body>
+</html>

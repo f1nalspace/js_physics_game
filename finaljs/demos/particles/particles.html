@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>Particles demo</title>
+    <link rel="stylesheet" type="text/css" href="../../content/style.css" media="all">
+    <script src="../../finaljs/core.js"></script>
+</head>
+<body>
+<canvas class="unselectable" id="canvas" width="1280" height="720" tabindex="1"></canvas>
+<script type="text/javascript">
+    final.addSourcePath("../../finaljs/");
+    final.addSourcePath("../../", "^(final\\.demos\\.particles\\..*)$");
+    final.load("final.demos.particles.Particles", function () {
+        var demo = new final.demos.particles.Particles(document.getElementById("canvas"));
+        demo.run();
+    });
+</script>
+</body>
+</html>

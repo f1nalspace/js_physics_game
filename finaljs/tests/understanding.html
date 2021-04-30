@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="../finaljs/core.js"></script>
+</head>
+<body>
+<img id="target" width="720" height="720"/>
+<script type="text/javascript">
+    var targetImage = document.getElementById("target");
+    var canvas = document.createElement("canvas");
+    canvas.width = targetImage.width;
+    canvas.height = targetImage.height;
+
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+
+    var cwidth = 500;
+    var cheight = 500;
+    var hw = cwidth * 0.5;
+    var hh = cheight * 0.5;
+    var tickValueX = 50;
+    var tickValueY = 50;
+
+    var left = -hw;
+    var right = hw;
+    var oben = -hh;
+    var bottom = hh;
+
+    var ticksX = Math.floor(cwidth / tickValueX);
+    var ticksY = Math.floor(cheight / tickValueY);
+
+    var fontHeight = 16;
+    ctx.font = "normal "+fontHeight+"px arial";
+
+    function Vec2(x, y){
+        this.x = x;
+        this.y = y;
+    }
+
+    Vec2.prototype.getLength = function(){
+        return Math.sqrt(this.x * this.x + this.y * this.y);
+    };
+
+    Vec2.prototype.getNormalized = function(){
+        var l = this.getLength();
+        if (l == 0) l = 1;
+        return new Vec2(this.x / l, this.y / l);
+    };
+
+    Vec2.prototype.getPerpRight = function(){
+        return new Vec2(-this.y, this.x);
+    };
+
+    Vec2.prototype.add = function(v){
+        return new Vec2(this.x + v.x, this.y + v.x);
+    };
+
+    Vec2.prototype.sub = function(v){
+        return new Vec2(this.x - v.x, this.y - v.y);
+    };
+
+    Vec2.prototype.toString = function(){
+        return "("+this.x+" , "+this.y+")";
+    };
+
+    Vec2.prototype.addMultScalar = function(v, scalar) {
+        return new Vec2(this.x + v.x * scalar, this.y + v.y * scalar);
+    };
+
+    function drawCircle(center, radius, color) {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2, false);
+        ctx.strokeStyle = color || "white";
+        ctx.stroke();
+        ctx.lineWidth = 1;
+    }
+
+    function drawPoint(point, color, title, ax, ay, titleColor) {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2, false);
+        ctx.fillStyle = color || "white";
+        ctx.fill();
+
+        if (typeof title != "undefined" && typeof ax != "undefined" && typeof ay != "undefined") {
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.fillStyle = titleColor || color || "white";
+            var margin = 10;
+            var tw = ctx.measureText(title).width;
+            var tx = point.x;
+            var ty = point.y;
+            if (ax == "left"){
+                tx = point.x - (tw * 0.5 + margin);
+            } else if (ax == "right"){
+                tx = point.x + (tw * 0.5 + margin);
+            }
+            if (ay == "top"){
+                ty = point.y - (fontHeight * 0.5 + margin);
+            } else if (ay == "bottom"){
+                ty = point.y + (fontHeight * 0.5 + margin);
+            }
+            ctx.fillText(title, tx, ty);
+        }
+
+    }
+
+    function drawText(x, y, text, color) {
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.fillStyle = color || "white";
+        ctx.fillText(text, x, y);
+    }
+
+    function drawVector(origin, vec, color, title, titleColor, titleIsOppsite, invert) {
+        var n = {x: (origin.x + vec.x) - origin.x, y: (origin.y + vec.y) - origin.y};
+        var l = Math.sqrt(n.x * n.x + n.y * n.y);
+        n.x /= l;
+        n.y /= l;
+        var t = {x: -n.y, y: n.x};
+        var arrowWidth = 12;
+        var arrowDepth = 12;
+        var textSpace = 20;
+
+        var target = new Vec2(origin.x + vec.x, origin.y + vec.y);
+
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(target.x, target.y);
+
+        if (!invert){
+            ctx.moveTo(target.x, target.y);
+            ctx.lineTo(target.x + t.x * arrowWidth + n.x * -arrowDepth, target.y + t.y * arrowWidth + n.y * -arrowDepth);
+            ctx.moveTo(target.x, target.y);
+            ctx.lineTo(target.x + t.x * -arrowWidth + n.x * -arrowDepth, target.y + t.y * -arrowWidth + n.y * -arrowDepth);
+        } else {
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(origin.x + t.x * arrowWidth + n.x * arrowDepth, origin.y + t.y * arrowWidth + n.y * arrowDepth);
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(origin.x + t.x * -arrowWidth + n.x * arrowDepth, origin.y + t.y * -arrowWidth + n.y * arrowDepth);
+        }
+
+        ctx.strokeStyle = color || "white";
+        ctx.stroke();
+        ctx.lineWidth = 1;
+
+        if (typeof title != "undefined" && title != null) {
+            var rad = Math.atan2(n.y, n.x);
+            ctx.fillStyle = titleColor || color || "white";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.save();
+            ctx.translate(0 + n.x * l * 0.5 + (titleIsOppsite ? t.x : -t.x) * textSpace, 0 + n.y * l * 0.5 + (titleIsOppsite ? t.y : -t.y) * textSpace);
+            ctx.rotate(rad > Math.PI / 2 || rad < -Math.PI / 2 ? rad - Math.PI : rad);
+            ctx.fillText(title, 0, 0);
+            ctx.restore();
+        }
+    }
+
+    function drawLine(start, end, color, title, titleColor, titleIsOppsite) {
+        var distance = end.sub(start);
+        var l = distance.getLength();
+        var n = distance.getNormalized();
+        var t = n.getPerpRight();
+        var textSpace = 20;
+
+        var lineCenter = new Vec2(start.x + n.x * l * 0.5, start.y + n.y * l * 0.5);
+
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.strokeStyle = color || "white";
+        ctx.stroke();
+        ctx.lineWidth = 1;
+
+        if (typeof title != "undefined" && title != null) {
+            var rad = Math.atan2(n.y, n.x);
+            ctx.fillStyle = titleColor || color || "white";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.save();
+            ctx.translate(lineCenter.x + (titleIsOppsite ? t.x : -t.x) * textSpace, lineCenter.y + (titleIsOppsite ? t.y : -t.y) * textSpace);
+            ctx.rotate(rad > Math.PI / 2 || rad < -Math.PI / 2 ? rad - Math.PI : rad);
+            ctx.fillText(title, 0, 0);
+            ctx.restore();
+        }
+    }
+
+    function drawCoordinateSystem() {
+        // Draw grid lines
+        ctx.beginPath();
+        for (var i = 0; i <= ticksY; i++) {
+            ctx.moveTo(left, bottom + i * -tickValueY);
+            ctx.lineTo(right, bottom + i * -tickValueY);
+        }
+        for (var i = 0; i <= ticksX; i++) {
+            ctx.moveTo(left + i * tickValueX, oben);
+            ctx.lineTo(left + i * tickValueX, bottom);
+        }
+        ctx.strokeStyle = "rgba(100,100,100,0.5)";
+        ctx.stroke();
+
+        // Draw axis lines
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(left, oben);
+        ctx.lineTo(left, bottom);
+        ctx.moveTo(right, oben);
+        ctx.lineTo(right, bottom);
+        ctx.moveTo(left, bottom);
+        ctx.lineTo(right, bottom);
+        ctx.moveTo(left, oben);
+        ctx.lineTo(right, oben);
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+        ctx.lineWidth = 1;
+
+        // Draw y-axis ticks
+        ctx.beginPath();
+        for (var i = 0; i <= ticksY; i++) {
+            ctx.moveTo(left - 30, bottom + i * -tickValueY);
+            ctx.lineTo(left, bottom + i * -tickValueY);
+            ctx.moveTo(right + 30, bottom + i * -tickValueY);
+            ctx.lineTo(right, bottom + i * -tickValueY);
+        }
+        ctx.strokeStyle = "grey";
+        ctx.stroke();
+
+        // Draw x-axis ticks
+        ctx.beginPath();
+        for (var i = 0; i <= ticksX; i++) {
+            ctx.moveTo(left + i * tickValueX, bottom);
+            ctx.lineTo(left + i * tickValueX, bottom + 30);
+            ctx.moveTo(left + i * tickValueX, oben);
+            ctx.lineTo(left + i * tickValueX, oben - 30);
+        }
+        ctx.strokeStyle = "grey";
+        ctx.stroke();
+
+        // Draw y-axis labels
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "white";
+        for (var i = 0; i <= ticksY; i++) {
+            var y = bottom + i * -tickValueY;
+            ctx.textAlign = "right";
+            ctx.fillText("" + y, left - 40, y);
+            ctx.textAlign = "left";
+            ctx.fillText("" + y, right + 40, y);
+        }
+
+        // Draw x-axis labels
+        ctx.textAlign = "center";
+        ctx.fillStyle = "white";
+        for (var i = 0; i <= ticksX; i++) {
+            var x = left + i * tickValueX;
+            ctx.textBaseline = "top";
+            ctx.fillText("" + x, x, bottom + 40);
+            ctx.textBaseline = "bottom";
+            ctx.fillText("" + x, x, oben - 40);
+        }
+    }
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.save();
+
+    ctx.translate(w * 0.5, h * 0.5);
+
+    // Draw coordinate system
+    drawCoordinateSystem();
+
+    // Draw stuff
+    var center = new Vec2(0, 0);
+
+    // Origin
+    drawPoint(center, "white", "origin", "center", "top");
+
+    /*
+    // Plane
+    var planeVec = new Vec2(150, 150);
+    console.log(planeVec.getLength());
+    var planeNormal = planeVec.getNormalized();
+    var planeTangent = planeNormal.getPerpRight();
+    var planePoint = planeVec;
+    var planeStart = new Vec2(planePoint.x + planeTangent.x * 300, planePoint.y + planeTangent.y * 300);
+    var planeEnd = new Vec2(planePoint.x + -planeTangent.x * 300, planePoint.y + -planeTangent.y * 300);
+    drawVector(center, planeVec, "yellow", "normal + distance", "white", false, true);
+    drawLine(planeStart, planeEnd, "grey", "plane", "white", true);
+    drawPoint(planePoint, "red");
+    */
+
+    /*
+    // Vector
+    var vec = new Vec2(150, 150);
+    drawVector(center, vec, "yellow", "normal * distance", "white", false, false);
+
+    */
+
+    /*
+    // Line segment
+    var lineStart = new Vec2(-150, 100);
+    var lineEnd = new Vec2(150, 0);
+    drawLine(lineStart, lineEnd, "yellow", "line");
+    drawPoint(lineStart, "white", "start", "center", "top");
+    drawPoint(lineEnd, "white", "end", "center", "top");
+    */
+
+
+    /*
+    // Line
+    var lineStart = new Vec2(-150, 100);
+    var lineEnd = new Vec2(150, 0);
+    var lineNormal = lineEnd.sub(lineStart).getNormalized();
+    drawLine(lineStart.addMultScalar(lineNormal, -100), lineEnd.addMultScalar(lineNormal, 100), "yellow");
+    drawVector(lineStart, lineEnd.sub(lineStart), "yellow");
+    drawVector(lineStart, lineEnd.sub(lineStart), "yellow", null, null, false, true);
+    */
+
+    // ray
+    var lineStart = new Vec2(-150, 100);
+    var lineEnd = new Vec2(150, 0);
+    var lineNormal = lineEnd.sub(lineStart).getNormalized();
+    drawLine(lineStart, lineEnd.addMultScalar(lineNormal, 100), "yellow");
+    drawVector(lineStart, lineEnd.sub(lineStart), "yellow");
+    drawPoint(lineStart, "white", "start", "center", "top");
+
+    ctx.restore();
+
+    targetImage.src = canvas.toDataURL("image/png");
+
+</script>
+</body>
+</html>

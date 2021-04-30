@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Integration</title>
+    <style>
+        #target {
+            float: left;
+            width: 25%;
+        }
+        #chart {
+            margin-left: 25%;
+            width: 75%;
+        }
+    </style>
+</head>
+<body>
+<div id="target"></div>
+<div id="chart"><canvas id="canvas" width="800" height="800"></canvas></div>
+<script type="text/javascript">
+    var target = document.getElementById("target");
+
+    var series = [];
+
+    function addTableCol(row, value, name, name) {
+        var col = document.createElement(name || "td");
+        col.appendChild(document.createTextNode(value));
+        row.appendChild(col);
+    }
+
+    function integrationTest(name, substeps, func, color) {
+        var serie = {
+            name: name,
+            color: color,
+            dataX: [],
+            dataY: []
+        };
+        series.push(serie);
+
+        var dt = 1;
+        var subDt = dt / substeps;
+        var steps = 10;
+
+        var body = {
+            velocity: 0,
+            prevPosition: 0,
+            position: 0,
+            force: 10,
+            mass: 1
+        };
+
+        var txt = name + (substeps > 1 ? " (" + substeps + " steps" : " (Single step");
+        txt += ", dt: " + dt;
+        txt += ")";
+        var title = document.createElement("h3");
+        title.appendChild(document.createTextNode(txt));
+        target.appendChild(title);
+
+        var tbl = document.createElement("table");
+        target.appendChild(tbl);
+
+        var headerRow = document.createElement("tr");
+        addTableCol(headerRow, "Time", "th");
+        addTableCol(headerRow, "Position", "th");
+        addTableCol(headerRow, "Velocity", "th");
+        tbl.appendChild(headerRow);
+
+        var time = 0;
+        while (time <= steps * dt) {
+            var row = document.createElement("tr");
+            addTableCol(row, time.toFixed(4));
+            addTableCol(row, body.position.toFixed(4));
+            addTableCol(row, body.velocity.toFixed(4));
+            serie.dataX.push(time);
+            serie.dataY.push(body.position);
+            tbl.appendChild(row);
+            for (var i = 0; i < substeps; i++) {
+                func(i, subDt, body);
+                time += subDt;
+            }
+        }
+    }
+
+    function createChart(series) {
+        // Calculate range
+        var range = {
+            minX: 0,
+            maxX: 0,
+            minY: 0,
+            maxY: 0,
+            numX: 0,
+            numY: 0
+        };
+        var i, j, serie, num;
+        for (i = 0; i < series.length; i++) {
+            serie = series[i];
+            num = 0;
+            for (j = 0; j < serie.dataX.length; j++) {
+                if (serie.dataX[j] < range.minX) {
+                    range.minX = serie.dataX[j];
+                }
+                if (serie.dataX[j] > range.maxX) {
+                    range.maxX = serie.dataX[j];
+                }
+                num++;
+            }
+            range.numX = Math.max(range.numX, num);
+
+            num = 0;
+            for (j = 0; j < serie.dataY.length; j++) {
+                if (serie.dataY[j] < range.minY) {
+                    range.minY = serie.dataY[j];
+                }
+                if (serie.dataY[j] > range.maxY) {
+                    range.maxY = serie.dataY[j];
+                }
+                num++;
+            }
+            range.numY = Math.max(range.numY, num);
+        }
+
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width, h = canvas.height;
+
+        ctx.font = "normal 20px arial";
+
+        // Fixate the axis sizes
+        var axisXHeight = 40;
+        var axisXWidth = 100;
+
+        var axisX = {
+            x: axisXWidth,
+            y: axisXHeight,
+            w: w - axisXWidth,
+            h: axisXHeight
+        };
+        var axisY = {
+            x: 0,
+            y: h - 10,
+            w: axisXWidth,
+            h: h - axisXHeight - 10
+        };
+
+        ctx.strokeStyle = "blue";
+        ctx.strokeRect(axisX.x, h - axisX.y, axisX.w, axisX.h);
+        ctx.strokeStyle = "red";
+        ctx.strokeRect(axisY.x, h - axisY.y, axisY.w, axisY.h);
+
+        var sizeX = axisX.w / range.numX;
+        for (i = 0; i < range.numX; i++) {
+            ctx.beginPath();
+            ctx.rect(axisX.x + i * sizeX, h - axisX.y, sizeX, axisX.h);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+        }
+
+        var rangeY = range.maxY - range.minY;
+        var stepY = 100; // How many values per step
+        var numStepsY = Math.ceil(rangeY / stepY);
+        var stepHeight = axisY.h / numStepsY;
+        var stepPixels = axisY.h / rangeY;
+
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+
+        var offsetY = h - axisY.y + axisY.h;
+        for (i = 0; i <= numStepsY; i++) {
+            ctx.fillStyle = "black";
+            ctx.fillText("" + i, axisY.x + axisY.w, offsetY);
+            offsetY -= stepHeight;
+        }
+    }
+
+    var acceleration = function (body) {
+        return body.force / body.mass;
+    };
+
+    integrationTest("Equations of Motion", 1, function (substep, dt, body) {
+        body.position += 0.5 * acceleration(body) * dt * dt + body.velocity * dt;
+        body.velocity += acceleration(body) * dt;
+    }, "black");
+    integrationTest("Implicit Euler", 1, function (substep, dt, body) {
+        body.position += body.velocity * dt;
+        body.velocity += acceleration(body) * dt;
+    }, "blue");
+    integrationTest("Explicit Euler", 1, function (substep, dt, body) {
+        body.velocity += acceleration(body) * dt;
+        body.position += body.velocity * dt;
+    }, "aqua");
+    integrationTest("Fixed Explicit Euler", 1, function (substep, dt, body) {
+        var temp = body.velocity;
+        body.velocity += acceleration(body) * dt;
+        body.position += (temp + body.velocity) * 0.5 * dt;
+    }, "yellow");
+    integrationTest("Verlet Integration", 1, function (substep, dt, body) {
+        var newPos = body.position + (body.position - body.prevPosition) + acceleration(body) * dt * dt;
+        body.prevPosition = body.position;
+        body.position = newPos;
+        body.velocity = body.position - body.prevPosition;
+    }, "red");
+    integrationTest("Runge-Kutta 4th order", 1, function (substep, dt, body) {
+        function derivative(dt, curr) {
+            var s = {
+                position: body.position + curr.position * dt,
+                velocity: body.velocity + curr.velocity * dt
+            };
+            s.position = s.velocity;
+            s.velocity = acceleration(body);
+            return s;
+        }
+        var t = {position: body.position, velocity: body.velocity};
+        var k1 = derivative(0, t);
+        var k2 = derivative(dt * 0.5, k1);
+        var k3 = derivative(dt * 0.5, k2);
+        var k4 = derivative(dt, k3);
+        body.position += (k1.position + 2 * (k2.position + k3.position) + k4.position) * dt / 6;
+        body.velocity += (k1.velocity + 2 * (k2.velocity + k3.velocity) + k4.velocity) * dt / 6;
+    }, "green");
+
+    // Built chart
+    createChart(series);
+</script>
+</body>
+</html>

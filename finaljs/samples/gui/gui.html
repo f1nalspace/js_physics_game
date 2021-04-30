@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script type="text/javascript" src="../../finaljs/core.js"></script>
+    <style type="text/css">
+        canvas {
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+<canvas id="game" width="800" height="400" tabindex="0"></canvas>
+<script type="text/javascript">
+    final.addSourcePath("../../finaljs/");
+    final.addSourcePath("../../", "^(final\\.samples\\.gui\\..*)$");
+    final.load("final.samples.gui.GUISampleApp", function () {
+        var app = new final.samples.gui.GUISampleApp(document.getElementById("game"));
+        app.run();
+    });
+</script>
+</body>
+</html>

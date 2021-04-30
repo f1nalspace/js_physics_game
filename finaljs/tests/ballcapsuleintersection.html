@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600"></canvas>
+<script type="text/javascript">
+(function () {
+    function Vec2(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    Vec2.prototype.dot = function (v) {
+        return this.x * v.x + this.y * v.y;
+    };
+
+    Vec2.prototype.add = function (v) {
+        return new Vec2(this.x + v.x, this.y + v.y);
+    };
+
+    Vec2.prototype.sub = function (v) {
+        return new Vec2(this.x - v.x, this.y - v.y);
+    };
+
+    Vec2.prototype.multScalar = function (scalar) {
+        return new Vec2(this.x * scalar, this.y * scalar);
+    };
+
+    Vec2.prototype.lengthSquared = function () {
+        return this.dot(this);
+    };
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+
+    if (!ctx.setLineDash) {
+        ctx.setLineDash = function () {
+        }
+    }
+
+    var w = canvas.width, h = canvas.height;
+
+    var epsilon = 1.1920929E-7;
+
+    var dt = 1.0 / 60.0;
+
+    ctx.lineWidth = 2;
+
+    ctx.translate(w * 0.5, h * 0.5);
+    ctx.scale(1, -1);
+
+    var intersectRayAABBLine = function (start, dir, min, max, rayResult) {
+        // If the line segment is more of a point, just check if it's within the segment
+        if (Math.abs(dir) < epsilon) {
+            return (start >= min && start <= max);
+        }
+
+        // Find if the lines overlap
+        var ooDir = 1.0 / dir;
+        var t0 = (min - start) * ooDir;
+        var t1 = (max - start) * ooDir;
+
+        // Make sure t0 is the "first" of the intersections
+        if (t0 > t1) {
+            var tmp = t0;
+            t0 = t1;
+            t1 = tmp;
+        }
+
+        // Check if intervals are disjoint
+        if (t0 > rayResult.leave || t1 < rayResult.enter) {
+            return false;
+        }
+
+        // Reduce interval based on intersection
+        if(t0 > rayResult.enter) {
+            rayResult.enter = t0;
+        }
+        if(t1 < rayResult.leave) {
+            rayResult.leave = t1;
+        }
+
+        return true;
+    };
+
+    var intersectRayAABB = function (start, end, min, max, rayResult) {
+        rayResult.enter = 0.0;
+        rayResult.leave = 1.0;
+
+        var dir = end.sub(start);
+
+        // Check each dimension of Line/AABB for intersection
+        if (!intersectRayAABBLine(start.x, dir.x, min.x, max.x, rayResult)) {
+            return false;
+        }
+        if (!intersectRayAABBLine(start.y, dir.y, min.y, max.y, rayResult)) {
+            return false;
+        }
+
+        // Construct intersection point
+        rayResult.point.x = start.x + dir.x * rayResult.enter;
+        rayResult.point.y = start.y + dir.y * rayResult.enter;
+        return true;
+    };
+
+    var intersectRayCircle = function (start, end, center, radius, rayResult) {
+        rayResult.enter = 0.0;
+        rayResult.leave = 1.0;
+
+        var dir = end.sub(start);
+
+        var rayStartToCircle = start.sub(center);
+
+        var a = dir.lengthSquared();
+        var b = 2 * (dir.x * (start.x - center.x) + dir.y * (start.y - center.y));
+        var c = rayStartToCircle.lengthSquared() - radius * radius;
+        var D = b * b - 4 * a * c;
+        if (a <= epsilon || D < 0) {
+            // No intersection
+            return false;
+        } else if (D == 0) {
+            // Tangent line: one intersection point
+            rayResult.enter = -b / 2 * a;
+            if (rayResult.enter <= 0 || rayResult.enter >= rayResult.leave) {
+                return false;
+            }
+        } else {
+            // Secant line: two intersection points
+            var d = Math.sqrt(D);
+
+            // Calculate intersection times
+            var t1 = (-b - d) / (2 * a);
+            var t2 = (-b + d) / (2 * a);
+
+            // Sort times
+            if (t1 > t2) {
+                var tmp = t1;
+                t1 = t2;
+                t2 = tmp;
+            }
+
+            // Get min and max time
+            rayResult.enter = Math.max(rayResult.enter, t1);
+            rayResult.leave = Math.min(rayResult.leave, t2);
+
+            // Exit when intersection is too late
+            if (rayResult.enter <= 0 || rayResult.enter >= rayResult.leave) {
+                return false;
+            }
+        }
+
+        // Ray intersects circle, return intersection point and time
+        rayResult.point.x = start.x + dir.x * rayResult.enter;
+        rayResult.point.y = start.y + dir.y * rayResult.enter;
+        return true;
+    };
+
+    var ballDisplacement = new Vec2(400, -150);
+    var ball = {
+        pos: new Vec2(-300, 200),
+        vel: ballDisplacement.multScalar(1.0 / dt),
+        radius: 30
+    };
+
+    var paddleDisplacement = new Vec2(300, 300);
+    var paddle = {
+        pos: new Vec2(-100, -200),
+        vel: paddleDisplacement.multScalar(1.0 / dt),
+        ext: new Vec2(70, 30),
+        radius: 30
+    };
+
+    var updateFrame = function (now) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
+
+        // Ball
+        var ballTargetPos = ball.pos.add(ball.vel.multScalar(dt));
+        ctx.beginPath();
+        ctx.moveTo(ball.pos.x, ball.pos.y);
+        ctx.lineTo(ballTargetPos.x, ballTargetPos.y);
+        ctx.strokeStyle = "aqua";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ball.pos.x, ball.pos.y, ball.radius, 0, Math.PI * 2, false);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ballTargetPos.x, ballTargetPos.y, ball.radius, 0, Math.PI * 2, false);
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Paddle
+        var paddleTargetPos = paddle.pos.add(paddle.vel.multScalar(dt));
+        ctx.beginPath();
+        ctx.moveTo(paddle.pos.x, paddle.pos.y);
+        ctx.lineTo(paddleTargetPos.x, paddleTargetPos.y);
+        ctx.strokeStyle = "orange";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(paddle.pos.x - paddle.ext.x, paddle.pos.y - paddle.ext.y);
+        ctx.lineTo(paddle.pos.x - paddle.ext.x, paddle.pos.y + paddle.ext.y);
+        ctx.moveTo(paddle.pos.x + paddle.ext.x, paddle.pos.y - paddle.ext.y);
+        ctx.lineTo(paddle.pos.x + paddle.ext.x, paddle.pos.y + paddle.ext.y);
+        ctx.arc(paddle.pos.x - paddle.ext.x, paddle.pos.y, paddle.radius, Math.PI / 2, Math.PI * 1.5, false);
+        ctx.arc(paddle.pos.x + paddle.ext.x, paddle.pos.y, paddle.radius, Math.PI * 1.5, Math.PI / 2, false);
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(paddleTargetPos.x - paddle.ext.x, paddleTargetPos.y - paddle.ext.y);
+        ctx.lineTo(paddleTargetPos.x - paddle.ext.x, paddleTargetPos.y + paddle.ext.y);
+        ctx.moveTo(paddleTargetPos.x + paddle.ext.x, paddleTargetPos.y - paddle.ext.y);
+        ctx.lineTo(paddleTargetPos.x + paddle.ext.x, paddleTargetPos.y + paddle.ext.y);
+        ctx.arc(paddleTargetPos.x - paddle.ext.x, paddleTargetPos.y, paddle.radius, Math.PI / 2, Math.PI * 1.5, false);
+        ctx.arc(paddleTargetPos.x + paddle.ext.x, paddleTargetPos.y, paddle.radius, Math.PI * 1.5, Math.PI / 2, false);
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Construct swept paddle aabb by making the minkowski sum of paddle and ball
+        var paddleAsCapsuleExt = paddle.ext.add(new Vec2(paddle.radius + ball.radius, ball.radius));
+
+        var relVel = ball.vel.sub(paddle.vel);
+        var relTarget = ball.pos.add(relVel.multScalar(dt));
+
+        var startPaddleAABB = {
+            min: paddle.pos.sub(paddleAsCapsuleExt),
+            max: paddle.pos.add(paddleAsCapsuleExt)
+        };
+
+        var rayResult = {
+            enter: 0.0,
+            leave: 1.0,
+            point: new Vec2(0, 0)
+        };
+        if (intersectRayAABB(ball.pos, relTarget, startPaddleAABB.min, startPaddleAABB.max, rayResult)) {
+            var correctedPaddlePos = paddle.pos.add(paddle.vel.multScalar(dt * rayResult.enter));
+            var correctedBallPos = ball.pos.add(ball.vel.multScalar(dt * rayResult.enter));
+
+            // Bottom left circle
+            if (correctedBallPos.x < correctedPaddlePos.x - paddle.ext.x) {
+                if (correctedBallPos.y < correctedPaddlePos.y - paddle.ext.y) {
+                    if (intersectRayCircle(ball.pos, relTarget, paddle.pos.sub(new Vec2(paddle.ext.x + paddle.radius, paddle.ext.y + paddle.radius)), paddle.radius, rayResult)) {
+                        correctedBallPos = ball.pos.add(ball.vel.multScalar(dt * rayResult.enter));
+                    }
+                } else {
+                    if (intersectRayCircle(ball.pos, relTarget, paddle.pos.sub(new Vec2(paddle.ext.x + paddle.radius, paddle.ext.y - paddle.radius)), paddle.radius, rayResult)) {
+                        correctedBallPos = ball.pos.add(ball.vel.multScalar(dt * rayResult.enter));
+                    }
+                }
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(correctedPaddlePos.x - paddle.ext.x, correctedPaddlePos.y - paddle.ext.y);
+            ctx.lineTo(correctedPaddlePos.x - paddle.ext.x, correctedPaddlePos.y + paddle.ext.y);
+            ctx.moveTo(correctedPaddlePos.x + paddle.ext.x, correctedPaddlePos.y - paddle.ext.y);
+            ctx.lineTo(correctedPaddlePos.x + paddle.ext.x, correctedPaddlePos.y + paddle.ext.y);
+            ctx.arc(correctedPaddlePos.x - paddle.ext.x, correctedPaddlePos.y, paddle.radius, Math.PI / 2, Math.PI * 1.5, false);
+            ctx.arc(correctedPaddlePos.x + paddle.ext.x, correctedPaddlePos.y, paddle.radius, Math.PI * 1.5, Math.PI / 2, false);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.rect(correctedPaddlePos.x - paddleAsCapsuleExt.x, correctedPaddlePos.y - paddleAsCapsuleExt.y, paddleAsCapsuleExt.x * 2, paddleAsCapsuleExt.y * 2);
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = "green";
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = "green";
+            ctx.beginPath();
+            ctx.arc(correctedPaddlePos.x - paddleAsCapsuleExt.x + paddle.radius, correctedPaddlePos.y - paddleAsCapsuleExt.y + paddle.radius, paddle.radius, 0, Math.PI * 2, false);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(correctedPaddlePos.x + paddleAsCapsuleExt.x - paddle.radius, correctedPaddlePos.y - paddleAsCapsuleExt.y + paddle.radius, paddle.radius, 0, Math.PI * 2, false);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(correctedPaddlePos.x - paddleAsCapsuleExt.x + paddle.radius, correctedPaddlePos.y + paddleAsCapsuleExt.y - paddle.radius, paddle.radius, 0, Math.PI * 2, false);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(correctedPaddlePos.x + paddleAsCapsuleExt.x - paddle.radius, correctedPaddlePos.y + paddleAsCapsuleExt.y - paddle.radius, paddle.radius, 0, Math.PI * 2, false);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.arc(correctedBallPos.x, correctedBallPos.y, 4, 0, Math.PI * 2, false);
+            ctx.fillStyle = "red";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(correctedBallPos.x, correctedBallPos.y, ball.radius, 0, Math.PI * 2, false);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+        }
+
+        requestAnimationFrame(updateFrame);
+    };
+
+    requestAnimationFrame(updateFrame);
+
+})();
+
+</script>
+</body>
+</html>

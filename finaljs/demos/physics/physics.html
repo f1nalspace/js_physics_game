@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>Physics demo - Sequential impulse method</title>
+    <link rel="stylesheet" type="text/css" href="../../content/style.css" media="all">
+    <script type="text/javascript" src="../../finaljs/core.js"></script>
+</head>
+<body>
+<canvas id="canvas" width="1280" height="720" tabindex="1"></canvas>
+<script type="text/javascript">
+    final.addSourcePath("../../finaljs/");
+    final.addSourcePath("../../", "^(final\\.demos\\.physics\\..*)$");
+    final.load("final.demos.physics.PhysicsDemo", function () {
+        var demo = new final.demos.physics.PhysicsDemo(document.getElementById("canvas"));
+        demo.run();
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script type="text/javascript" src="../finaljs/core.js"></script>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" width="400" height="200"></canvas>
+<script type="text/javascript">
+    var charts = {};
+    (function(chart){
+        function log10(val) {
+            return Math.log(val) / Math.LN10;
+        }
+
+        function niceNum(num, round) {
+            var exponent = Math.floor(log10(num));
+            var fraction = num / Math.pow(10, exponent);
+            var niceFraction;
+            if (round) {
+                if (fraction < 1.5)
+                    niceFraction = 1;
+                else if (fraction < 3)
+                    niceFraction = 2;
+                else if (fraction < 7)
+                    niceFraction = 5;
+                else
+                    niceFraction = 10;
+            } else {
+                if (fraction <= 1)
+                    niceFraction = 1;
+                else if (fraction <= 2)
+                    niceFraction = 2;
+                else if (fraction <= 5)
+                    niceFraction = 5;
+                else
+                    niceFraction = 10;
+            }
+            return niceFraction * Math.pow(10, exponent);
+        }
+
+        function updateScale(output, min, max, maxTicks) {
+            var range = niceNum(Math.max(max, min) - Math.min(max, min), false);
+            var tickSpacing = niceNum(range / (maxTicks - 1), true);
+            var niceMin = (min < 0 ? Math.floor(min / tickSpacing) : Math.ceil(min / tickSpacing)) * tickSpacing;
+            var niceMax = (max > 0 ? Math.ceil(max / tickSpacing) : Math.floor(max / tickSpacing)) * tickSpacing;
+            output.range = range;
+            output.niceMin = niceMin;
+            output.niceMax = niceMax;
+            output.tickSpacing = tickSpacing;
+        }
+
+        function YAxis(min, max, flip, lineColor) {
+            this.fontSize = 16;
+            this.fontColor = "white";
+            this.lineColor = lineColor || "white";
+            this.xpadding = 5;
+            this.flip = flip || false;
+            this.min = min;
+            this.max = max;
+            this.scale = {
+                range: 0,
+                niceMin: 0,
+                niceMax: 0,
+                tickSpacing: 0
+            };
+            this.maxTicks = 0;
+            this.ticks = 0;
+            this.tickValue = 0;
+            this.tickPixel = 0;
+            this.data = [];
+            this.dataFormatter = function(v){
+                return (v / 1000000).toFixed(2) + " MB";
+            };
+            this.offset = [0, 0];
+            this.width = 0;
+            this.pos = [0, 0];
+        }
+
+        YAxis.prototype.update = function(height, min, max) {
+            this.min = min || this.min;
+            this.max = max || this.max;
+            this.maxTicks = Math.max(Math.floor(height / this.fontSize), 1);
+            updateScale(this.scale, this.min, this.max, this.maxTicks);
+            this.ticks = this.scale.range / this.scale.tickSpacing;
+            this.tickValue = this.scale.tickSpacing;
+            this.tickPixel = height / this.ticks;
+        };
+
+        YAxis.prototype.getMax = function() {
+            return Math.max(this.scale.niceMin, this.scale.niceMax);
+        };
+
+        YAxis.prototype.getMin = function() {
+            return Math.min(this.scale.niceMin, this.scale.niceMax);
+        };
+
+        YAxis.prototype.add = function(v) {
+            this.data.push(v);
+        };
+
+        function LineChart(){
+            this.yaxes = [];
+            this.sampleFactor = 0.1;
+            this.ypadding = 5;
+            this.legendFontSize = 10;
+            this.legendYPadding = 5;
+        }
+
+        LineChart.prototype.createYAxis = function(flip, lineColor){
+            var yaxis = new YAxis(0, 0, flip, lineColor);
+            this.yaxes.push(yaxis);
+            return yaxis;
+        };
+
+        LineChart.prototype.draw = function(ctx, x, y, w, h){
+            var leftScaleWidth = 0;
+            var rightScaleWidth = 0;
+            var leftOffset = 0;
+            var rightOffset = 0;
+            var ypadding = this.ypadding;
+
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                yaxis.offset[0] = 0;
+            }
+
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                ypadding = Math.max(ypadding, yaxis.fontSize / 2);
+                ctx.font = "normal " + yaxis.fontSize + "px arial";
+                var textWidth = ctx.measureText(yaxis.dataFormatter(yaxis.getMax())).width;
+                yaxis.width = textWidth + yaxis.xpadding * 2;
+                if (!yaxis.flip) {
+                    leftScaleWidth += yaxis.width;
+                    leftOffset += yaxis.width;
+                    yaxis.offset[0] = leftOffset;
+                } else {
+                    rightScaleWidth += yaxis.width;
+                    yaxis.offset[0] = rightOffset;
+                    rightOffset += yaxis.width;
+                }
+            }
+
+            // Adjust viewport
+            var vw = w - leftScaleWidth - rightScaleWidth;
+            var vh = h - (ypadding * 2 + this.legendFontSize + this.legendYPadding * 2);
+            var vx = x+leftOffset;
+            var vy = y+ypadding;
+            var sampleWidth = vw * this.sampleFactor;
+            var maxDataLen = Math.floor(vw / sampleWidth);
+
+            // Update axis
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                yaxis.update(vh, yaxis.min, yaxis.max);
+            }
+
+            var startX = vx;
+            var startY = vy + vh;
+
+            ctx.strokeStyle = "green";
+            ctx.strokeRect(vx, vy, vw, vh);
+
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                var ax = vx - yaxis.offset[0];
+                if (yaxis.flip) {
+                    ax = vx + vw + yaxis.offset[0];
+                }
+                var ay = vy;
+                yaxis.pos[0] = ax;
+                yaxis.pos[1] = ay;
+
+                // Step numbers
+                ctx.fillStyle = yaxis.fontColor;
+                ctx.textBaseline = "middle";
+                ctx.textAlign = !yaxis.flip ? "right" : "left";
+                ctx.font = "normal " + yaxis.fontSize + "px arial";
+                for (var j = 0; j <= yaxis.ticks; j++) {
+                    var v = j * yaxis.tickValue;
+                    var t = "" + yaxis.dataFormatter(yaxis.scale.niceMin + v);
+                    ctx.fillText(t, ax + (!yaxis.flip ? yaxis.width - yaxis.xpadding : yaxis.xpadding), ay + vh - j * yaxis.tickPixel);
+                }
+            }
+
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                var index = Math.max(0, (yaxis.data.length - maxDataLen) - 1);
+                var ax = yaxis.pos[0];
+                var ay = yaxis.pos[1];
+
+                ctx.strokeStyle = "white";
+                ctx.strokeRect(ax, ay, yaxis.width, vh);
+
+                var oneTickPixel = yaxis.tickPixel / yaxis.tickValue;
+
+                // Data
+                if (yaxis.data.length > 1) {
+                    ctx.strokeStyle = yaxis.lineColor;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY - oneTickPixel * (yaxis.data[index] - yaxis.scale.niceMin));
+                    for (var j = index; j < index + Math.min(yaxis.data.length, maxDataLen) + 1; j++) {
+                        var v = yaxis.data[j] - yaxis.scale.niceMin;
+                        ctx.lineTo(startX + (j-index) * sampleWidth, startY - oneTickPixel * v);
+                    }
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                }
+            }
+
+            ctx.font = "normal " + this.legendFontSize + "px sans";
+            ctx.textBaseline = "top";
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            for (var i = 0; i < this.yaxes.length; i++) {
+                var yaxis = this.yaxes[i];
+                ctx.fillStyle = yaxis.lineColor;
+                ctx.textAlign = yaxis.flip ? "left" : "right";
+                var ax = yaxis.pos[0] + (!yaxis.flip ? yaxis.width - yaxis.xpadding : yaxis.xpadding);
+                var ay = yaxis.pos[1];
+                if (yaxis.data.length > 0) {
+                    ctx.strokeText("" + yaxis.dataFormatter(yaxis.scale.niceMin + yaxis.data[yaxis.data.length - 1]), ax + (yaxis.xpadding * (yaxis.flip ? -1 : 1)), ay + vh + this.legendYPadding * 2);
+                    ctx.fillText("" + yaxis.dataFormatter(yaxis.scale.niceMin + yaxis.data[yaxis.data.length - 1]), ax + (yaxis.xpadding * (yaxis.flip ? -1 : 1)), ay + vh + this.legendYPadding * 2);
+                }
+            }
+            ctx.lineWidth = 1;
+        };
+
+        charts.LineChart = LineChart;
+    })(charts);
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+
+    var someRandomJunk = [];
+    function doSomething(){
+        someRandomJunk.push(Math.random() * 500 + 1 / 0.5);
+        for (var j = 0; j < Math.ceil(Math.random() * 1000); j++) {
+            someRandomJunk.push({haha: Math.random() * 1000});
+        }
+    }
+
+    var interval = 500;
+    var nextTime = 0;
+
+    var chart = new charts.LineChart();
+    var memAxis = chart.createYAxis(false, "yellow");
+    var dtAxis = chart.createYAxis(true, "aqua");
+    dtAxis.dataFormatter = function(v){
+        return v.toFixed(3) + " s";
+    };
+
+    var minMem = 0;
+    var maxMem = 0;
+
+    var minDt = 0;
+    var maxDt = 1/60 * 2;
+
+    var lastTime = window.performance.now();
+
+    var loop = function (msecs) {
+        requestAnimationFrame(loop);
+
+        var dt = (msecs - lastTime) / 1000;
+        lastTime = msecs;
+
+        doSomething();
+
+        if (nextTime - Date.now() < 0) {
+            nextTime = Date.now() + interval;
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = "gray";
+            ctx.fillRect(0, 0, w, h);
+
+            var usedMemory = window.performance.memory.usedJSHeapSize;
+            var totalMemory = window.performance.memory.totalJSHeapSize;
+            minMem = minMem == null ? usedMemory : Math.min(minMem, usedMemory);
+            maxMem = Math.max(maxMem, usedMemory);
+            memAxis.update(h, minMem, maxMem);
+            memAxis.add(usedMemory);
+
+            dtAxis.update(h, minDt, maxDt);
+            dtAxis.add(dt);
+
+            chart.draw(ctx, 0, 0, w, h);
+        }
+
+    };
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

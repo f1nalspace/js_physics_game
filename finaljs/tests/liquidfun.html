@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="../finaljs/core.js"></script>
+    <script src="../3rd/fpsmeter.min.js"></script>
+    <script src="../3rd/liquidfun.js"></script>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600" tabindex="1"></canvas>
+<div id="meter"></div>
+<script type="text/javascript">
+function Vec2(x, y) {
+    this.x = x || 0;
+    this.y = y || 0;
+}
+
+var meter = new FPSMeter(document.getElementById("meter"), {
+    top: 'auto',
+    left: 'auto',
+    graph: 1
+});
+
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var w = canvas.width;
+var h = canvas.height;
+var timeStep = 1.0 / 60.0;
+var velocityIterations = 8;
+var positionIterations = 3;
+var drawScale = 20;
+var world = new b2World(new b2Vec2(0, 10));
+
+ctx.font = "normal 20px arial";
+ctx.textBaseline = "top";
+ctx.textAlign = "left";
+
+var particleRadius = 0.1;
+
+function createBox(x, y, angle, w, h, type, density) {
+    var bodyDef = new b2BodyDef();
+    bodyDef.type = type || b2_staticBody;
+    bodyDef.position.Set(x, y);
+    bodyDef.angle = Math.PI / 180 * angle;
+    var body = world.CreateBody(bodyDef);
+    var shape = new b2PolygonShape();
+    shape.SetAsBoxXY(w * 0.5, h * 0.5);
+    body.CreateFixtureFromShape(shape, density || 0);
+}
+
+function createCircle(x, y, radius, type, density) {
+    var bodyDef = new b2BodyDef();
+    bodyDef.type = type || b2_staticBody;
+    bodyDef.position.Set(x, y);
+    var body = world.CreateBody(bodyDef);
+    var circle = new b2CircleShape();
+    circle.radius = radius;
+    var fixtureDef = new b2FixtureDef();
+    fixtureDef.density = density || 0;
+    fixtureDef.shape = circle;
+    fixtureDef.restitution = 0.6;
+    body.CreateFixtureFromDef(fixtureDef);
+}
+
+function createEdge(x, y, angle, v0, v1, type, density) {
+    var bodyDef = new b2BodyDef();
+    bodyDef.type = type || b2_staticBody;
+    bodyDef.position.Set(x, y);
+    bodyDef.angle = Math.PI / 180 * angle;
+    var body = world.CreateBody(bodyDef);
+    var edge = new b2EdgeShape();
+    edge.Set(v0, v1);
+    body.CreateFixtureFromShape(edge, density || 0);
+}
+
+function createChain(x, y, angle, verts, type, density) {
+    var bodyDef = new b2BodyDef();
+    bodyDef.type = type || b2_staticBody;
+    bodyDef.position.Set(x, y);
+    bodyDef.angle = Math.PI / 180 * angle;
+    var body = world.CreateBody(bodyDef);
+    var chain = new b2ChainShape();
+    chain.vertices = verts;
+    chain.CreateLoop();
+    body.CreateFixtureFromShape(chain, density || 0);
+}
+
+function createParticles(x, y, radius, shape, color) {
+    var psd = new b2ParticleSystemDef();
+    psd.radius = radius;
+    psd.dampingStrength = 0.2;
+    psd.colorMixingStrength = 0.75;
+    var particleSystem = world.CreateParticleSystem(psd);
+    var pd = new b2ParticleGroupDef();
+    pd.flags = b2_waterParticle | b2_colorMixingParticle;
+    pd.position.Set(x, y);
+    pd.shape = shape;
+    pd.color = color;
+    particleSystem.CreateParticleGroup(pd);
+}
+
+function ParticleEmitter(x, y, radius) {
+    var psd = new b2ParticleSystemDef();
+    psd.radius = radius;
+    psd.dampingStrength = 0.2;
+    this.pos = new Vec2(x, y);
+    this.emitRate = 1.0;
+    this.emitRemainder = 0;
+    this.emitted = 0;
+    this.system = world.CreateParticleSystem(psd);
+    var pd = new b2ParticleDef();
+    pd.color = new b2ParticleColor(0, 255, 0, 255);
+    pd.position.Set(this.pos.x + Math.random() * 0.25, this.pos.y + Math.random() * 0.25);
+    pd.flags = b2_waterParticle;
+    this.pdef = pd;
+}
+
+ParticleEmitter.prototype.createParticle = function () {
+    var pd = this.pdef;
+    pd.position.Set(this.pos.x + Math.random() * 0.25, this.pos.y + Math.random() * 0.25);
+    this.system.CreateParticle(pd);
+};
+
+ParticleEmitter.prototype.update = function (dt) {
+    this.emitRemainder += this.emitRate * dt;
+    while (this.emitRemainder > 1.0) {
+        this.emitRemainder -= 1.0;
+        this.emitted++;
+        this.createParticle();
+    }
+};
+
+createBox(0, 10, 0, 25, 1);
+createBox(0, -10, 0, 25, 1);
+createBox(-13, 0, 90, 21, 1);
+createBox(13, 0, 90, 21, 1);
+
+createEdge(0, -5, 5, new b2Vec2(-12.6, 0), new b2Vec2(11, 0));
+createEdge(0, 0, -5, new b2Vec2(-11, 0), new b2Vec2(12.6, 0));
+createEdge(0, 5, 5, new b2Vec2(-12.6, 0), new b2Vec2(11, 0));
+
+createCircle(-2, -8, 0.5, b2_dynamicBody, 1.0);
+
+var particleShape = new b2PolygonShape();
+particleShape.SetAsBoxXY(4, 1);
+//createParticles(-8, -8, 0.1, particleShape, new b2ParticleColor(0, 0, 255, 255));
+
+var emitter = new ParticleEmitter(0, -2, 0.1);
+
+var particleImage = (function () {
+    var particleCanvas = document.createElement("canvas");
+    particleCanvas.width = 32;
+    particleCanvas.height = 32;
+    var particleCtx = particleCanvas.getContext("2d");
+    particleCtx.beginPath();
+    //particleCtx.rect(0, 0, 32, 32);
+    particleCtx.arc(16, 16, 8, 0, Math.PI * 2, false);
+    particleCtx.fillStyle = "blue";
+    particleCtx.fill();
+    return particleCanvas;
+})();
+
+function definePolygon(shape, transform) {
+    ctx.beginPath();
+    for (var i = 0, max = shape.vertices.length; i < max; i++) {
+        var v = new b2Vec2();
+        b2Vec2.Mul(v, transform, shape.vertices[i]);
+        if (i == 0) {
+            ctx.moveTo(v.x * drawScale, v.y * drawScale);
+        } else {
+            ctx.lineTo(v.x * drawScale, v.y * drawScale);
+        }
+    }
+    ctx.closePath();
+}
+
+function defineCircle(shape, transform) {
+    ctx.beginPath();
+    ctx.arc(transform.p.x * drawScale, transform.p.y * drawScale, shape.radius * drawScale, 0, Math.PI * 2, false);
+}
+
+function defineEdge(shape, transform) {
+    ctx.beginPath();
+    var v0 = new b2Vec2(), v1 = new b2Vec2();
+    b2Vec2.Mul(v0, transform, shape.vertex1);
+    b2Vec2.Mul(v1, transform, shape.vertex2);
+    ctx.moveTo(v0.x * drawScale, v0.y * drawScale);
+    ctx.lineTo(v1.x * drawScale, v1.y * drawScale);
+}
+
+function defineChain(shape, transform) {
+    ctx.beginPath();
+    for (var i = 0, max = shape.vertices.length; i < max; i++) {
+        var v = new b2Vec2();
+        b2Vec2.Mul(v, transform, shape.vertices[i]);
+        if (i == 0) {
+            ctx.moveTo(v.x * drawScale, v.y * drawScale);
+        } else {
+            ctx.lineTo(v.x * drawScale, v.y * drawScale);
+        }
+    }
+}
+
+function defineFixture(fixture, transform) {
+    var shape = fixture.shape;
+    if (shape instanceof b2PolygonShape) {
+        definePolygon(shape, transform);
+    } else if (shape instanceof b2CircleShape) {
+        defineCircle(shape, transform);
+    } else if (shape instanceof b2EdgeShape) {
+        defineEdge(shape, transform);
+    } else if (shape instanceof b2ChainShape) {
+        defineChain(shape, transform);
+    }
+
+}
+
+function drawBody(body) {
+    var maxFixtures = body.fixtures.length;
+    var transform = body.GetTransform();
+    for (var j = 0; j < maxFixtures; j++) {
+        var fixture = body.fixtures[j];
+        defineFixture(fixture, transform);
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+    }
+}
+
+var drawedParticles = 0;
+function drawParticleSystem(system) {
+    var count = system.GetParticleCount();
+    var positions = system.GetPositionBuffer();
+    var colors = system.GetColorBuffer();
+    for (var i = 0; i < count; i++) {
+        var cx = positions[i * 2 + 0];
+        var cy = positions[i * 2 + 1];
+        var cr = colors[i * 4 + 0];
+        var cg = colors[i * 4 + 1];
+        var cb = colors[i * 4 + 2];
+        var ca = colors[i * 4 + 3];
+        var radius = particleRadius;
+        ctx.beginPath();
+        ctx.arc(cx * drawScale, cy * drawScale, radius * drawScale, 0, Math.PI * 2, false);
+        ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ca + ")";
+        ctx.fill();
+        //ctx.drawImage(particleImage, (cx - radius) * drawScale, (cy - radius) * drawScale, radius * 2 * drawScale, radius * 2 * drawScale);
+        drawedParticles++;
+    }
+}
+
+var frameRequest = function () {
+    var i, max;
+
+    emitter.update(0.1);
+
+    world.Step(timeStep, velocityIterations, positionIterations);
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.save();
+    ctx.translate(w * 0.5, h * 0.5);
+    for (i = 0, max = world.bodies.length; i < max; i++) {
+        drawBody(world.bodies[i]);
+    }
+    drawedParticles = 0;
+    for (i = 0, max = world.particleSystems.length; i < max; i++) {
+        drawParticleSystem(world.particleSystems[i]);
+    }
+    ctx.restore();
+
+    ctx.fillStyle = "white";
+    ctx.fillText("Particles: " + drawedParticles, 10, 10);
+
+    meter.tick();
+
+    requestAnimationFrame(frameRequest);
+};
+requestAnimationFrame(frameRequest);
+</script>
+</body>
+</html>

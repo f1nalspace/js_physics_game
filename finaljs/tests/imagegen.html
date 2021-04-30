@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script type="text/javascript" src="../finaljs/core.js"></script>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" width="128" height="128"></canvas><br/>
+<br/>
+<img id="target"/>
+<script type="text/javascript">
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var target = document.getElementById("target");
+
+    var w = canvas.width;
+    var h = canvas.height;
+
+    //ctx.fillStyle = "black";
+    //ctx.fillRect(0, 0, w, h);
+
+    var r = Math.min(w, h) * 0.5;
+
+    ctx.translate(w * 0.5, h * 0.5);
+
+    var grad = ctx.createRadialGradient(0, 0, r, 0, 0, r * 0.01);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(255,255,255,255)");
+    ctx.fillStyle = grad;
+
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2, false);
+    ctx.fill();
+
+    target.src = canvas.toDataURL();
+</script>
+</body>
+</html>
